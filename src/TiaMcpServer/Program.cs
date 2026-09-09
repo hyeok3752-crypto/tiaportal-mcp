@@ -18,11 +18,9 @@ namespace TiaMcpServer
 
             Engineering.TiaMajorVersion = options.TiaMajorVersion ?? 20;
 
-            if (Engineering.TiaMajorVersion < 20)
-            {
-                AppDomain.CurrentDomain.AssemblyResolve += Engineering.Resolver;
-            }
-            else
+            AppDomain.CurrentDomain.AssemblyResolve += Engineering.Resolver;
+
+            if (Engineering.TiaMajorVersion >= 20)
             {
                 Openness.Initialize(Engineering.TiaMajorVersion);
             }

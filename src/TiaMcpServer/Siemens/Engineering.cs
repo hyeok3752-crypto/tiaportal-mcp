@@ -51,13 +51,14 @@ namespace TiaMcpServer.Siemens
 
         private static string? GetTiaPortalInstallPath()
         {
-            var subKeyName = $@"SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{TiaMajorVersion}\TIA_Opns";
+            using var regBaseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
 
-            using (var regBaseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
-            using (var tiaOpnsKey = regBaseKey.OpenSubKey(subKeyName))
-            {
-                return tiaOpnsKey?.GetValue("Path")?.ToString();
-            }
+            var tiaOpnsKey = regBaseKey.OpenSubKey($@"SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{TiaMajorVersion}\TIA_Opns");
+            if (tiaOpnsKey != null)
+                return tiaOpnsKey.GetValue("Path")?.ToString();
+
+            var globalKey = regBaseKey.OpenSubKey($@"SOFTWARE\Siemens\Automation\_InstalledSW\TIAP{TiaMajorVersion}\Global");
+            return globalKey?.GetValue("Path")?.ToString();
         }
 
         private static string? FindAssemblyRecursive(string directory, string fileName, IEnumerable<string> excludedTiaMajorVersions)
