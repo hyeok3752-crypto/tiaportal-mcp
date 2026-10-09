@@ -14,7 +14,7 @@
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
     <PackageReference Include="Siemens.Collaboration.Net.OperatingSystem.Windows" Version="3.0.1725521661" />
     <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Openness.Resolver" Version="2.0.1765367256" />
-    <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Packages.Openness" Version="21.0.1765349347" />
+    <PackageReference Include="Siemens.Collaboration.Net.TiaPortal.Packages.Openness" Version="20.0.1744190253" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Management">
@@ -22,7 +22,72 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <!-- Direct PLC (S7CommPlus) diagnostics - bypasses Openness entirely, see THIRD_PARTY_LICENSES.md.
+         Referenced as prebuilt DLLs rather than ProjectReference: the submodule's legacy-format
+         csproj only defines Debug/Release x64|x86 configs (no AnyCPU) and targets net4.7.2 (no
+         targeting pack installed here, only net48) - a ProjectReference forces Platform=x64 onto
+         this whole project's own build, which changes its output path. Rebuild the DLLs after
+         updating the submodule with:
+           dotnet build third_party\S7CommPlusDriver\src\S7CommPlusDriver\S7CommPlusDriver.csproj -c Debug -p:Platform=x64 -p:TargetFrameworkVersion=v4.8 -->
+    <Reference Include="S7CommPlusDriver">
+      <HintPath>..\..\third_party\S7CommPlusDriver\src\S7CommPlusDriver\bin\x64\Debug\S7CommPlusDriver.dll</HintPath>
+    </Reference>
+    <Reference Include="zlib.net">
+      <HintPath>..\..\third_party\S7CommPlusDriver\src\Zlib.net\bin\x64\Debug\zlib.net.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- S7CommPlusDriver P/Invokes OpenSSL directly (libssl/libcrypto), loaded from the running
+         exe's own directory - must be copied here explicitly, a managed DLL reference alone does
+         not bring along a dependency's native siblings. -->
+    <None Include="..\..\third_party\S7CommPlusDriver\src\S7CommPlusDriver\OpenSSL-dll-x64\libssl-3-x64.dll" Link="libssl-3-x64.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\third_party\S7CommPlusDriver\src\S7CommPlusDriver\OpenSSL-dll-x64\libcrypto-3-x64.dll" Link="libcrypto-3-x64.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Remove="tests\**" />
     <None Include="tests\**" />
   </ItemGroup>
+
+  <!-- Bakes the git commit this exe was built from into BuildInfo.g.cs, so a running server can
+       report "what commit am I" (GetServerVersion tool) without any runtime git/network call -
+       useful after the 2026-10-09 stale-DLL incident, where a rebuilt exe silently kept serving
+       old code with no way to tell from the outside. All git calls use -C "$(MSBuildProjectDirectory)"
+       so they're independent of whatever working directory ultimately launches the exe. -->
+  <Target Name="WriteGitBuildInfo" BeforeTargets="CoreCompile">
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-parse HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitCommit" />
+    </Exec>
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; rev-parse --abbrev-ref HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low" ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitBranch" />
+    </Exec>
+    <Exec Command="git -C &quot;$(MSBuildProjectDirectory)&quot; status --porcelain" ConsoleToMSBuild="true" StandardOutputImportance="low" ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ConsoleOutput" ItemName="GitStatusLines" />
+    </Exec>
+    <!-- Commit date deliberately not captured here: git's format option needs a literal % that
+         survives both MSBuild's own %-escaping and the Exec task's generated batch file's
+         %-escaping, which proved unreliable in practice - VersionInfo.cs looks it up at runtime
+         instead via ProcessStartInfo directly (no shell/batch file involved, no escaping issue). -->
+    <PropertyGroup>
+      <GitCommit Condition="'$(GitCommit)' == ''">unknown</GitCommit>
+      <GitBranch Condition="'$(GitBranch)' == ''">unknown</GitBranch>
+      <GitDirty>false</GitDirty>
+      <GitDirty Condition="'@(GitStatusLines)' != ''">true</GitDirty>
+      <BuildInfoFile>$(IntermediateOutputPath)BuildInfo.g.cs</BuildInfoFile>
+    </PropertyGroup>
+    <ItemGroup>
+      <BuildInfoLines Include="// Auto-generated at build time by the WriteGitBuildInfo target - do not edit." />
+      <BuildInfoLines Include="namespace TiaMcpServer%3B" />
+      <BuildInfoLines Include="internal static class BuildInfo" />
+      <BuildInfoLines Include="{" />
+      <BuildInfoLines Include="    public const string GitCommit = &quot;$(GitCommit)&quot;%3B" />
+      <BuildInfoLines Include="    public const string GitBranch = &quot;$(GitBranch)&quot;%3B" />
+      <BuildInfoLines Include="    public const bool GitDirty = $(GitDirty.ToLower())%3B" />
+      <BuildInfoLines Include="}" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(BuildInfoFile)" Lines="@(BuildInfoLines)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <Compile Include="$(BuildInfoFile)" />
+      <FileWrites Include="$(BuildInfoFile)" />
+    </ItemGroup>
+  </Target>
 </Project>

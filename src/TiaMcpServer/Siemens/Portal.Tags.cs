@@ -714,7 +714,11 @@ namespace TiaMcpServer.Siemens
                 () =>
                 {
                     EnsureValidName(newName);
-                    RequireWatchTable(softwarePath, watchTablePath).Name = newName;
+                    // PlcWatchTable.Name has no public setter on TIA Portal V20's Openness API
+                    // (confirmed against the installed V20 Siemens.Engineering.xml - V21+ adds a
+                    // setter, this fork targets V20) - SetAttribute is the generic fallback this
+                    // codebase already uses elsewhere for the same situation.
+                    RequireWatchTable(softwarePath, watchTablePath).SetAttribute("Name", newName);
                     return true;
                 },
                 ("softwarePath", softwarePath), ("watchTablePath", watchTablePath), ("newName", newName));
