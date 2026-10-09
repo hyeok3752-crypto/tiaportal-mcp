@@ -269,6 +269,23 @@ namespace TiaMcpServer.ModelContextProtocol
         public bool? IsUserInGroup { get; set; }
         public bool? AllowWrite { get; set; }
         public IEnumerable<ResponseTiaInstallation>? Installations { get; set; }
+
+        // Git-commit-based build freshness, on top of the plain ServerVersion (AssemblyVersion)
+        // above - added after a rebuilt exe was confirmed to silently keep serving a month-old
+        // DLL with no way to tell from outside it. BuiltCommit* come from BuildInfo.g.cs (baked
+        // in at compile time); CurrentSourceCommit/RemoteMainCommit are live, on-demand git calls
+        // (see VersionInfo.cs), skipped when checkRemote=false.
+        public string? BuiltCommit { get; set; }
+        public string? BuiltCommitShort { get; set; }
+        public string? BuiltBranch { get; set; }
+        public string? BuiltCommitDate { get; set; }
+        public bool BuiltDirty { get; set; }
+        public string? CurrentSourceCommit { get; set; }
+        public bool? CurrentSourceDirty { get; set; }
+        public bool? BuiltMatchesCurrentSource { get; set; }
+        public string? RemoteMainCommit { get; set; }
+        public bool? CurrentSourceMatchesRemote { get; set; }
+        public string? RemoteCheckError { get; set; }
     }
 
     public class ResponseGetProjects : ResponseMessage
