@@ -15,7 +15,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace TiaMcpServer.Siemens
 {
@@ -80,6 +82,62 @@ namespace TiaMcpServer.Siemens
                         dir => ExportXmlType(softwarePath, dir, typePath) is not null);
                 },
                 ("softwarePath", softwarePath), ("typePath", typePath), ("format", format));
+        }
+
+        /// <summary>
+        /// Reads a block's networks (SW.Blocks.CompileUnit elements) as SCL text. Openness has no
+        /// Network/CompileUnit object model at all - confirmed via reflection, zero matching types
+        /// anywhere in Siemens.Engineering.* - so this is the only way to read a network's content.
+        /// GetBlockSource above covers pure SCL/STL/DB blocks via TIA's own "document" exporter,
+        /// but falls back to raw XML for mixed-language blocks (e.g. a LAD-typed FB with individual
+        /// SCL networks inside it) - this method is specifically for that case: it renders the
+        /// StructuredText v4 XML grammar inside each network back into real SCL source, instead of
+        /// handing back raw XML. LAD/FBD networks (FlgNet content) come back with
+        /// IsStructuredText=false and Text=null; rendering ladder logic to text is out of scope.
+        /// networkIndex selects a single network (0-based, export order); omit/-1 for all.
+        /// </summary>
+        public IEnumerable<NetworkSourceInfo> GetNetworkSource(string softwarePath, string blockPath, int networkIndex = -1)
+        {
+            return Operation.Run(_logger, nameof(GetNetworkSource), PortalErrorCode.ExportFailed,
+                () =>
+                {
+                    var block = GetBlock(softwarePath, blockPath)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"Block not found at '{blockPath}'. Use 'ResolveObjectPath' or 'GetBlocks' to find its path.");
+
+                    if (!block.IsConsistent)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidState,
+                            $"Block '{block.Name}' is inconsistent; TIA Portal does not export inconsistent blocks. Compile the software first.");
+                    }
+
+                    using var scope = new SourceScope(_logger);
+                    var exportPath = Path.Combine(scope.Directory, $"{block.Name}.xml");
+                    block.Export(new FileInfo(exportPath), ExportOptions.None);
+
+                    var doc = XDocument.Load(exportPath);
+                    var compileUnits = doc.Descendants().Where(e => e.Name.LocalName == "SW.Blocks.CompileUnit").ToList();
+
+                    var result = new List<NetworkSourceInfo>();
+                    for (var i = 0; i < compileUnits.Count; i++)
+                    {
+                        if (networkIndex >= 0 && i != networkIndex)
+                        {
+                            continue;
+                        }
+
+                        result.Add(ParseCompileUnit(compileUnits[i], i));
+                    }
+
+                    if (networkIndex >= 0 && result.Count == 0)
+                    {
+                        throw new PortalException(PortalErrorCode.NotFound,
+                            $"Network index {networkIndex} not found; block has {compileUnits.Count} network(s).");
+                    }
+
+                    return (IEnumerable<NetworkSourceInfo>)result;
+                },
+                ("softwarePath", softwarePath), ("blockPath", blockPath), ("networkIndex", networkIndex));
         }
 
         #endregion
@@ -1436,6 +1494,232 @@ namespace TiaMcpServer.Siemens
         }
 
         #endregion
+
+        #region network source rendering
+
+        // Renders the StructuredText v4 XML grammar (Token/Blank/NewLine/Access/CallInfo/
+        // Parameter/LineComment/Comment/Text) back into SCL source text. Namespace is ignored
+        // throughout (LocalName only) since only this one element subtree uses the
+        // StructuredText XML namespace and nothing else in the export collides on local name.
+
+        private static NetworkSourceInfo ParseCompileUnit(XElement cu, int index)
+        {
+            var attributeList = cu.Elements().FirstOrDefault(e => e.Name.LocalName == "AttributeList");
+            var networkSource = attributeList?.Elements().FirstOrDefault(e => e.Name.LocalName == "NetworkSource");
+            var structuredText = networkSource?.Elements().FirstOrDefault(e => e.Name.LocalName == "StructuredText");
+            var programmingLanguage = attributeList?.Elements().FirstOrDefault(e => e.Name.LocalName == "ProgrammingLanguage")?.Value;
+
+            return new NetworkSourceInfo
+            {
+                Index = index,
+                Title = GetMultilingualText(cu, "Title"),
+                Comment = GetMultilingualText(cu, "Comment"),
+                ProgrammingLanguage = string.IsNullOrEmpty(programmingLanguage) ? null : programmingLanguage,
+                IsStructuredText = structuredText != null,
+                Text = structuredText != null ? RenderStructuredText(structuredText) : null
+            };
+        }
+
+        // Reads one MultilingualText composition (CompositionName = "Title" or "Comment"),
+        // preferring the en-US item and falling back to the first non-empty translation.
+        private static string? GetMultilingualText(XElement cu, string compositionName)
+        {
+            var multilingualText = cu.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "MultilingualText" && (string?)e.Attribute("CompositionName") == compositionName);
+
+            if (multilingualText == null)
+            {
+                return null;
+            }
+
+            string? fallback = null;
+
+            foreach (var item in multilingualText.Descendants().Where(e => e.Name.LocalName == "MultilingualTextItem"))
+            {
+                var culture = item.Descendants().FirstOrDefault(e => e.Name.LocalName == "Culture")?.Value;
+                var text = item.Descendants().FirstOrDefault(e => e.Name.LocalName == "Text")?.Value;
+
+                if (string.IsNullOrEmpty(text))
+                {
+                    continue;
+                }
+
+                if (culture == "en-US")
+                {
+                    return text;
+                }
+
+                fallback ??= text;
+            }
+
+            return fallback;
+        }
+
+        private static string RenderStructuredText(XElement container)
+        {
+            var sb = new StringBuilder();
+            foreach (var child in container.Elements())
+            {
+                RenderNode(child, sb);
+            }
+            return sb.ToString();
+        }
+
+        private static void RenderNode(XElement c, StringBuilder sb)
+        {
+            switch (c.Name.LocalName)
+            {
+                case "Token":
+                    sb.Append((string?)c.Attribute("Text") ?? "");
+                    break;
+                case "Blank":
+                    sb.Append(' ', ParseNum(c));
+                    break;
+                case "NewLine":
+                    sb.Append('\n', ParseNum(c));
+                    break;
+                case "Access":
+                    RenderAccess(c, sb);
+                    break;
+                case "LineComment":
+                    sb.Append("//").Append(ConcatText(c));
+                    break;
+                case "Comment":
+                    sb.Append("(*").Append(ConcatText(c)).Append("*)");
+                    break;
+                case "Text":
+                    sb.Append(c.Value);
+                    break;
+            }
+        }
+
+        private static int ParseNum(XElement e)
+        {
+            var attr = (string?)e.Attribute("Num");
+            return attr != null && int.TryParse(attr, out var n) ? n : 1;
+        }
+
+        private static string ConcatText(XElement e) =>
+            string.Concat(e.Descendants().Where(d => d.Name.LocalName == "Text").Select(d => d.Value));
+
+        private static void RenderAccess(XElement c, StringBuilder sb)
+        {
+            var scope = (string?)c.Attribute("Scope");
+
+            if (scope == "LiteralConstant" || scope == "TypedConstant")
+            {
+                var value = c.Descendants().FirstOrDefault(d => d.Name.LocalName == "ConstantValue");
+                var type = c.Descendants().FirstOrDefault(d => d.Name.LocalName == "ConstantType");
+                if (type != null && scope == "TypedConstant")
+                {
+                    sb.Append(type.Value).Append('#');
+                }
+                sb.Append(value != null ? value.Value : "?");
+                return;
+            }
+
+            var callInfo = c.Elements().FirstOrDefault(e => e.Name.LocalName == "CallInfo");
+            if (scope == "Call" && callInfo != null)
+            {
+                RenderCallInfo(callInfo, sb);
+                return;
+            }
+
+            if (scope == "LocalVariable" || scope == "GlobalVariable" || scope == "Call")
+            {
+                RenderSymbolAccess(c, scope, sb);
+                return;
+            }
+
+            sb.Append('<').Append(scope).Append('>');
+        }
+
+        // CallInfo's children are rendered with their own NewLine/Blank handling (a NewLine here
+        // is always a single '\n' regardless of its Num attribute) - matches how TIA lays out
+        // multi-line call argument lists, confirmed against real exported SCL call networks.
+        private static void RenderCallInfo(XElement ci, StringBuilder sb)
+        {
+            var instanceComponent = ci.Elements().FirstOrDefault(e => e.Name.LocalName == "Instance")
+                ?.Elements().FirstOrDefault(e => e.Name.LocalName == "Component");
+
+            sb.Append('"').Append((string?)instanceComponent?.Attribute("Name") ?? "").Append('"');
+
+            foreach (var k in ci.Elements())
+            {
+                switch (k.Name.LocalName)
+                {
+                    case "Token":
+                        sb.Append((string?)k.Attribute("Text") ?? "");
+                        break;
+                    case "Parameter":
+                        sb.Append((string?)k.Attribute("Name") ?? "");
+                        foreach (var pc in k.Elements())
+                        {
+                            RenderNode(pc, sb);
+                        }
+                        break;
+                    case "NewLine":
+                        sb.Append('\n');
+                        break;
+                    case "Blank":
+                        sb.Append(' ', ParseNum(k));
+                        break;
+                }
+            }
+        }
+
+        // LocalVariable/GlobalVariable (and bare Call) access: a dotted Symbol/Component chain.
+        // The first Component is quoted ("Db") for GlobalVariable or '#'-prefixed for
+        // LocalVariable; later Components (after a '.' Token) are plain. Array index brackets
+        // are NOT added here - the exported XML already contains literal "[" / "]" Token
+        // children inside the indexed Component, so rendering them in place is correct.
+        private static void RenderSymbolAccess(XElement c, string scope, StringBuilder sb)
+        {
+            var symbol = c.Elements().FirstOrDefault(e => e.Name.LocalName == "Symbol");
+            if (symbol == null)
+            {
+                return;
+            }
+
+            var any = false;
+
+            foreach (var cc in symbol.Elements())
+            {
+                if (cc.Name.LocalName == "Component")
+                {
+                    var name = (string?)cc.Attribute("Name") ?? "";
+
+                    if (!any && scope == "GlobalVariable")
+                    {
+                        sb.Append('"').Append(name).Append('"');
+                    }
+                    else if (!any && scope == "LocalVariable")
+                    {
+                        sb.Append('#').Append(name);
+                    }
+                    else
+                    {
+                        sb.Append(name);
+                    }
+                    any = true;
+
+                    foreach (var x in cc.Elements())
+                    {
+                        if (x.Name.LocalName == "Token" || x.Name.LocalName == "Access")
+                        {
+                            RenderNode(x, sb);
+                        }
+                    }
+                }
+                else if (cc.Name.LocalName == "Token")
+                {
+                    sb.Append((string?)cc.Attribute("Text") ?? "");
+                    any = true;
+                }
+            }
+        }
+
+        #endregion
     }
 
     /// <summary>Source text of one object plus what had to be done to obtain it.</summary>
@@ -1457,6 +1741,22 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>File names TIA Portal produced, without the scratch directory.</summary>
         public List<string> FileNames { get; set; } = new List<string>();
+    }
+
+    /// <summary>
+    /// One network (SW.Blocks.CompileUnit) inside a block, as read back from its exported XML by
+    /// GetNetworkSource - reconstructed from the same XML ExportXmlBlock writes, since Openness has
+    /// no Network/CompileUnit object model. Text is the rendered SCL source for StructuredText
+    /// (SCL) networks; null for LAD/FBD networks (FlgNet content is not parsed).
+    /// </summary>
+    public class NetworkSourceInfo
+    {
+        public int Index { get; set; }
+        public string? Title { get; set; }
+        public string? Comment { get; set; }
+        public string? ProgrammingLanguage { get; set; }
+        public bool IsStructuredText { get; set; }
+        public string? Text { get; set; }
     }
 
     /// <summary>What a whole-PLC snapshot produced.</summary>

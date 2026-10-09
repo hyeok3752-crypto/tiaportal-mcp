@@ -528,6 +528,21 @@ namespace TiaMcpServer.ModelContextProtocol
         public IEnumerable<string>? FileNames { get; set; }
     }
 
+    public class ResponseNetwork
+    {
+        public int Index { get; set; }
+        public string? Title { get; set; }
+        public string? Comment { get; set; }
+        public string? ProgrammingLanguage { get; set; }
+        public bool IsStructuredText { get; set; }
+        public string? Text { get; set; }
+    }
+
+    public class ResponseNetworkSource : ResponseMessage
+    {
+        public IEnumerable<ResponseNetwork>? Networks { get; set; }
+    }
+
     public class ResponseInterfaceMember
     {
         public string? Name { get; set; }

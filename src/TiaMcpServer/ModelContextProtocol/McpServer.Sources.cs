@@ -39,6 +39,44 @@ namespace TiaMcpServer.ModelContextProtocol
                 "block");
         }
 
+        [McpServerTool(Name = "GetNetworkSource", Title = "Get a block's networks as SCL text", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Read a block's networks (CompileUnits) back as SCL text - for the case 'GetBlockSource' can't cover: a mixed-language block (e.g. a LAD-typed FB with individual SCL networks inside it), where 'document' format falls back to raw XML. Exports to a throwaway temp file internally (nothing written to a caller-visible location) and renders the StructuredText (SCL) XML grammar back into source, including call parameter lists and array indices. LAD/FBD networks come back with isStructuredText=false and text=null - ladder logic is not rendered. There is no write-side counterpart yet.")]
+        public static ResponseNetworkSource GetNetworkSource(
+            [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
+            [Description("blockPath: root-relative path of the block, e.g. '0_OBs/Main'. Use 'ResolveObjectPath' if you only know the name")] string blockPath,
+            [Description("networkIndex: 0-based network index to read; omit or pass -1 to read all networks in the block")] int networkIndex = -1)
+        {
+            try
+            {
+                var networks = Portal.GetNetworkSource(softwarePath, blockPath, networkIndex)
+                    .Select(n => new ResponseNetwork
+                    {
+                        Index = n.Index,
+                        Title = n.Title,
+                        Comment = n.Comment,
+                        ProgrammingLanguage = n.ProgrammingLanguage,
+                        IsStructuredText = n.IsStructuredText,
+                        Text = n.Text
+                    })
+                    .ToList();
+
+                return new ResponseNetworkSource
+                {
+                    Message = $"Read {networks.Count} network(s) from '{blockPath}'",
+                    Networks = networks,
+                    Meta = Ok(new JsonObject { ["networkCount"] = networks.Count })
+                };
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error reading network source for '{blockPath}': {ex.Message}", ex);
+            }
+        }
+
         /// <summary>Shared response shaping for the two source readers.</summary>
         private static ResponseSourceText Sourced(Func<SourceTextResult> read, string objectPath, string kind)
         {
