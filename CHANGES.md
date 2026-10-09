@@ -5,6 +5,57 @@
 
 ---
 
+## [2026-10-09] `GetServerVersion` 신규 + `WritePlcTagValueDirect`(P8) 신규, PLCSIM 라이브 검증 완료
+
+### GetServerVersion - 실행 중인 exe가 어느 커밋인지 확인
+바로 전 S7CommPlus 크래시 디버깅 때 "빌드 성공했다고 떴는데 실제로는 한 달 전 DLL을 계속
+쓰고 있었다"는 걸 겪고 나서, 사용자 질문("툴의 최신화 상태 확인하는 거 MCP 서버에 넣을 수
+있나?")으로 바로 이어져서 구현. 빌드 시점에 MSBuild 타겟(`WriteGitBuildInfo`)이 git
+커밋/브랜치/dirty 여부를 `BuildInfo.g.cs`에 구워넣고(커밋 날짜는 `%` 이스케이핑이 MSBuild
+Exec 배치 파일 레이어에서 계속 깨져서 - `%25cI`/`%2525cI` 다 시도해봤지만 실패 - 런타임 C#
+쪽에서 직접 git 호출하는 걸로 변경), 새 도구 `GetServerVersion(checkRemote=true)`가 이걸
+읽어서 "빌드된 커밋" vs "지금 소스트리 커밋"(둘이 다르면 재빌드 필요) vs "origin/main의 커밋"
+(`git ls-remote`, fetch 없이 조회, 둘이 다르면 pull 필요)을 비교해서 반환.
+- 저장소 루트는 실행 중인 exe 폴더에서 `.git`을 찾을 때까지 상위로 올라가며 탐색 - 작업
+  디렉터리에 의존 안 함(바로 전 `C:\WINDOWS\System32` 사건의 교훈을 그대로 반영).
+- **버그 하나 더 발견+수정**: `RunGit` 헬퍼가 stdout만 `ReadToEnd()`로 읽고 stderr는 안
+  읽어서, `git ls-remote` 호출이 거의 항상 멈춰버리는 고전적인 파이프 데드락이 있었음 -
+  stdout/stderr를 `ReadToEndAsync()`로 동시에 드레인하도록 수정, `GIT_TERMINAL_PROMPT=0`도
+  추가해서 자격 증명 프롬프트로 멈추는 것도 방지.
+- 검증: 일반 작업 디렉터리 + `C:\WINDOWS\System32` 양쪽에서 실제 호출, 빌드 커밋/소스트리
+  커밋/origin 커밋이 전부 올바르게 비교됨을 확인.
+
+### WritePlcTagValueDirect (P8, Cowork 요청) - PLCSIM 전용 태그 쓰기
+Cowork가 `vs_reference/REQUESTS.md`에 남긴 P8 요청대로 구현. `ConnectPlcDirect`/
+`ReadPlcTagValuesDirect`가 정상 동작하니, Dry_Run 같은 값을 바꿔가며 로직을 자동 검증하고
+싶다는 배경 - 사용자가 PLCSIM 한정으로 쓰기 승인.
+
+안전장치 (요청대로 전부 구현):
+- `confirm`과 `confirmPlcSimOnly` **둘 다** `true`여야 실제로 씀 - 하나라도 빠지면 미리보기만
+  반환(현재 값 + 쓰려는 값)하고 아무것도 안 씀. S7CommPlus 프로토콜 레벨에서는 PLCSIM과 실제
+  라인을 구분할 방법이 없어서(`confirmPlcSimOnly`는 호출자 본인이 보증하는 것 - 이 코드가
+  검증할 수 없음), 도구 설명에 "실제/운영 CPU일 수 있으면 절대 confirm=true로 호출하지 말 것"
+  이라고 명시.
+- 세이프티(F) DB/블록 이름 휴리스틱 차단(`F_`/`_F`/`Safety`/`FailSafe` 패턴) - S7CommPlus가
+  F-DB 여부를 알려주는 플래그를 전혀 노출하지 않아서, 이름 기반 최선 노력일 뿐 보장은 아님을
+  명시.
+- 1회 호출당 최대 10개 태그로 제한.
+- 쓰기 전/후 값을 둘 다 반환(쓰기 후 재조회) - 응답만 보고도 실제로 반영됐는지 확인 가능.
+- 지원 타입: Bool/Int/DInt/Real/Time (요청에서 우선순위로 지정한 것만 - Time은 단일
+  `"<숫자><단위>"`(ms/s/m/h/d) 또는 밀리초 정수만 지원, 읽기 결과의 복합 형식(`"1h02m"` 등)은
+  쓰기 입력으로는 미지원).
+
+검증: 실제 PLCSIM(192.168.0.1)에 라이브로 전체 시나리오 테스트 - 미리보기(둘 다 false, 안 씀)
+-> 하나만 confirm(안 씀) -> 세이프티 이름 차단(안 씀) -> 실제 쓰기(`MainAssy.Mode.Dry_Run`을
+반대 값으로) -> 재조회로 실제 반영 확인 -> 원래 값으로 복구. 전부 기대대로 동작, 테스트 끝나고
+PLCSIM 상태를 테스트 시작 전과 동일하게 복구함.
+
+### 메모
+라이브 쓰기 테스트 실행 시 Claude Code의 자동 모드 보안 분류기가 최초 1회 차단 - PLCSIM임을
+사용자가 명시적으로 재확인해준 뒤 재시도해서 통과. 우회 시도 없이 사용자 승인을 받고 진행함.
+
+---
+
 ## [2026-10-09] ConnectPlcDirect 크래시 진짜 원인 확정 + 수정 (TLS keylog 콜백, 작업 디렉터리)
 
 전날 커밋한 `RunThread()` try/catch 패치가 Cowork 쪽 재현에서는 계속 실패해서 (VS 쪽 PowerShell

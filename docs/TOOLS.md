@@ -34,6 +34,7 @@ project (never reaches actual PLC hardware - see the "Safety" note at the end).
 | `Disconnect` | idempotent | - | Disconnects from TIA Portal. |
 | `GetState` | RO | - | Returns `isConnected`, open `project`/`session` name. |
 | `Doctor` | RO | - | Environment diagnostics: connection state, active/installed TIA versions, Openness user group membership. Never connects or changes anything. Installed-version scan only reports V21+ (a working V20 install won't show up there - see `CHANGES.md`). |
+| `GetServerVersion` | RO | `checkRemote` (optional, default true) | Reports the git commit this running exe was actually built from (baked in at compile time), plus - on demand, never automatic - whether the source tree has moved since that build and whether it's behind `origin/main` on GitHub (a quick `git ls-remote`, no fetch/pull). Exists because a rebuilt exe can silently keep serving old code with no way to tell from outside it - confirmed live (see `CHANGES.md` 2026-10-09). `checkRemote=false` stays fully offline/local-only. Requires `git` on PATH; independent of the process's working directory. |
 
 ## Project / session
 
@@ -225,12 +226,13 @@ your use case; requires CPU firmware with S7CommPlus/TLS support (S7-1200 >= V4.
 | `DisconnectPlcDirect` | idempotent | - | |
 | `BrowsePlcTagsDirect` | RO, EXPERIMENTAL | `regexName` (optional) | Lists symbolic tags the CPU exposes (name, data type, internal access sequence). Every sub-member of every nested FB instance is its own tag - confirmed live, a real project returned 736,312 unfiltered. Use `regexName` (e.g. a DB name). |
 | `ReadPlcTagValuesDirect` | RO, EXPERIMENTAL | `tagNames` (string array) | Plain dotted symbol paths, e.g. `"MainAssy.Mode.Dry_Run"` (no TIA-style quotes). An unresolvable/bad-quality tag is reported per-item (`success: false`, `error`) rather than failing the whole call. |
+| `WritePlcTagValueDirect` | **Destructive**, EXPERIMENTAL, **PLCSIM only** | `tagNames`, `values` (string arrays), `confirm` (default false), `confirmPlcSimOnly` (default false) | Writes tag values live. **Both** `confirm` and `confirmPlcSimOnly` must be `true` to actually write - either false returns a preview (current value + what would be written) and writes nothing. This tool cannot tell PLCSIM from a real line over this protocol - `confirmPlcSimOnly` exists because *you* are the only check for that; never pass `confirm=true` against anything that might be a real/production CPU. Supports Bool/Int/DInt/Real/Time only (Time: plain integer = ms, or `"<number><unit>"` e.g. `"300ms"`/`"10s"` - not the composite read format). Refuses more than 10 tags per call, and any tag name matching an F-DB/safety naming heuristic (best-effort, not a guarantee - S7CommPlus exposes no real safety flag). Returns old/new value per tag (re-read after writing) so the response alone shows whether it took effect. |
 | `GetActivePlcAlarmsDirect` | RO, EXPERIMENTAL | `languageId` (optional, default 1033/en-US) | One-time snapshot (`GetActiveAlarms`), not a live subscription - call again to refresh. Covers ProDiag/user-program alarms; **not** the classic SZL-based diagnostic buffer (S7CommPlus has no SZL access, so a literal "Online & Diagnostics > Diagnostic buffer" equivalent isn't available). |
 
-Explicitly out of scope so far: any watch/force-table write or tag-modify capability, and the
-driver's own `AlarmSubscriptionCreate`/live-notification API (its own author marks the subscription
-code experimental, with several `// TODO! Unknown value!` markers - `GetActiveAlarms` above is a
-simpler, better-documented poll used instead).
+Explicitly out of scope so far: the driver's own `AlarmSubscriptionCreate`/live-notification API
+(its own author marks the subscription code experimental, with several `// TODO! Unknown value!`
+markers - `GetActiveAlarms` above is a simpler, better-documented poll used instead), and any
+watch/force-table capability beyond the plain tag write above.
 
 ## Safety: what these tools *cannot* do
 

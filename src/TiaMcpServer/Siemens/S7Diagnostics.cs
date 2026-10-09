@@ -27,6 +27,17 @@ namespace TiaMcpServer.Siemens
         public string? Error { get; set; }
     }
 
+    public class S7TagWriteResult
+    {
+        public string Name { get; set; } = "";
+        public string? DataType { get; set; }
+        public string? OldValue { get; set; }
+        public string? NewValue { get; set; }
+        public bool Written { get; set; }
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+    }
+
     // One active (currently coming or not-yet-gone) alarm, from GetActiveAlarms - a point-in-time
     // snapshot (poll), not a live subscription.
     public class S7Alarm
@@ -207,6 +218,201 @@ namespace TiaMcpServer.Siemens
             }
 
             return results;
+        }
+
+        // Names this won't write to, no matter what confirm/forceWrite say - a best-effort
+        // heuristic (Siemens F-DB/safety naming conventions), NOT a guarantee: S7CommPlus exposes
+        // no safety/fail-safe flag anywhere in Browse()/VarInfo, so there is no reliable
+        // protocol-level way to detect an F-DB. The real safety boundary is the caller: this tool
+        // must only ever be pointed at PLCSIM, never a real line, and that is not something this
+        // code can verify either - see the confirmPlcSimOnly gate and the tool description.
+        private static readonly System.Text.RegularExpressions.Regex SafetyNameBlocklist =
+            new(@"(^|[._])F_|_F($|[._])|Safety|FailSafe|Fail_Safe", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        private const int MaxWriteBatchSize = 10;
+
+        // tagNames/values are the same dotted-symbol format as ReadTagValues. Two gates must both
+        // be true to actually write anything - confirm (the normal "really do this" gate) and
+        // confirmPlcSimOnly (the caller explicitly asserting the connected target is PLCSIM, not
+        // a real line - this code has no way to verify that itself). With either false, this
+        // returns a preview (current value + what would be written) without writing anything.
+        public List<S7TagWriteResult> WriteTagValues(IEnumerable<(string Name, string Value)> writes, bool confirm, bool confirmPlcSimOnly)
+        {
+            var conn = RequireConnection();
+            var writeList = writes.ToList();
+
+            if (writeList.Count > MaxWriteBatchSize)
+            {
+                throw new InvalidOperationException($"Refusing to write {writeList.Count} tags in one call - max {MaxWriteBatchSize} per call.");
+            }
+
+            var results = new List<S7TagWriteResult>();
+            var tagsToWrite = new List<PlcTag>();
+            var valuesByTag = new Dictionary<PlcTag, PValue>();
+            var resultByTag = new Dictionary<PlcTag, S7TagWriteResult>();
+
+            foreach (var (name, value) in writeList)
+            {
+                var result = new S7TagWriteResult { Name = name, NewValue = value };
+                results.Add(result);
+
+                if (SafetyNameBlocklist.IsMatch(name))
+                {
+                    result.Error = "Refused: tag name matches the F-DB/safety naming blocklist (best-effort heuristic, not a guarantee).";
+                    continue;
+                }
+
+                PlcTag? tag;
+                try
+                {
+                    tag = WithSuppressedConsoleOut(() => conn.getPlcTagBySymbol(name));
+                }
+                catch (Exception ex)
+                {
+                    result.Error = ex.Message;
+                    continue;
+                }
+
+                if (tag == null)
+                {
+                    result.Error = "Tag not found";
+                    continue;
+                }
+
+                result.DataType = SafeTypeName(tag.Datatype);
+
+                if (!TryParseIntoTag(tag, value, out var parseError))
+                {
+                    result.Error = parseError;
+                    continue;
+                }
+
+                tagsToWrite.Add(tag);
+                valuesByTag[tag] = tag.GetWriteValue();
+                resultByTag[tag] = result;
+            }
+
+            if (tagsToWrite.Count == 0)
+            {
+                return results;
+            }
+
+            // Read current ("before") values regardless of confirm, so a preview call shows the
+            // real current value alongside the proposed new one.
+            var readRes = WithSuppressedConsoleOut(() => conn.ReadTags(tagsToWrite));
+            foreach (var tag in tagsToWrite)
+            {
+                var r = resultByTag[tag];
+                r.OldValue = tag.Quality == PlcTagQC.TAG_QUALITY_GOOD ? tag.ToString() : null;
+            }
+
+            if (!confirm || !confirmPlcSimOnly)
+            {
+                foreach (var tag in tagsToWrite)
+                {
+                    var r = resultByTag[tag];
+                    r.Success = true;
+                    r.Written = false;
+                    r.Error = "Preview only - not written. Set confirm=true and confirmPlcSimOnly=true to actually write.";
+                }
+                return results;
+            }
+
+            var addresses = tagsToWrite.Select(t => t.Address).ToList();
+            var values = tagsToWrite.Select(t => valuesByTag[t]).ToList();
+            List<ulong>? writeErrors = null;
+            var writeRes = WithSuppressedConsoleOut(() => conn.WriteValues(addresses, values, out writeErrors));
+            if (writeRes != 0)
+            {
+                throw new InvalidOperationException($"WriteValues failed (S7CommPlus error code {writeRes}).");
+            }
+
+            // Re-read so NewValue reflects what the PLC actually has now, not just what we asked for.
+            WithSuppressedConsoleOut(() => conn.ReadTags(tagsToWrite));
+
+            for (var i = 0; i < tagsToWrite.Count; i++)
+            {
+                var tag = tagsToWrite[i];
+                var r = resultByTag[tag];
+                var writeError = writeErrors != null && i < writeErrors.Count ? writeErrors[i] : 0UL;
+                r.Written = writeError == 0;
+                r.Success = writeError == 0;
+                r.NewValue = tag.Quality == PlcTagQC.TAG_QUALITY_GOOD ? tag.ToString() : r.NewValue;
+                r.Error = writeError == 0 ? null : $"Write error code {writeError}";
+            }
+
+            return results;
+        }
+
+        // Supports the types explicitly in scope for now (Bool, Int, DInt, Real, Time) - matches
+        // the same textual format ReadTagValues/ToString() produce where practical. Time only
+        // accepts a single "<number><unit>" (ms/s/m/h/d) or a plain integer (= milliseconds), not
+        // the composite "1h02m" form ToString() can produce on read.
+        private static bool TryParseIntoTag(PlcTag tag, string value, out string? error)
+        {
+            error = null;
+            switch (tag)
+            {
+                case PlcTagBool b:
+                    if (bool.TryParse(value, out var bv)) { b.Value = bv; return true; }
+                    if (value == "1") { b.Value = true; return true; }
+                    if (value == "0") { b.Value = false; return true; }
+                    error = $"Could not parse '{value}' as Bool (expected true/false/1/0).";
+                    return false;
+
+                case PlcTagInt i16:
+                    if (short.TryParse(value, out var i16v)) { i16.Value = i16v; return true; }
+                    error = $"Could not parse '{value}' as Int (Int16).";
+                    return false;
+
+                case PlcTagDInt i32:
+                    if (int.TryParse(value, out var i32v)) { i32.Value = i32v; return true; }
+                    error = $"Could not parse '{value}' as DInt (Int32).";
+                    return false;
+
+                case PlcTagReal real:
+                    if (float.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var fv)) { real.Value = fv; return true; }
+                    error = $"Could not parse '{value}' as Real (float).";
+                    return false;
+
+                case PlcTagTime time:
+                    if (TryParseTimeMs(value, out var ms)) { time.Value = ms; return true; }
+                    error = $"Could not parse '{value}' as Time - expected a plain integer (milliseconds) or '<number><unit>' with unit ms/s/m/h/d, e.g. '300ms' or '10s'.";
+                    return false;
+
+                default:
+                    error = $"Writing data type '{SafeTypeName(tag.Datatype)}' is not supported yet (supported: Bool, Int, DInt, Real, Time).";
+                    return false;
+            }
+        }
+
+        private static bool TryParseTimeMs(string value, out int milliseconds)
+        {
+            milliseconds = 0;
+            value = value.Trim();
+            if (int.TryParse(value, out milliseconds))
+            {
+                return true;
+            }
+
+            var match = System.Text.RegularExpressions.Regex.Match(value, @"^(-?\d+)\s*(ms|s|m|h|d)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            var n = int.Parse(match.Groups[1].Value);
+            var unit = match.Groups[2].Value.ToLowerInvariant();
+            milliseconds = unit switch
+            {
+                "ms" => n,
+                "s" => n * 1000,
+                "m" => n * 60_000,
+                "h" => n * 3_600_000,
+                "d" => n * 86_400_000,
+                _ => 0
+            };
+            return true;
         }
 
         // Point-in-time snapshot of currently active alarms (GetActiveAlarms), not a live

@@ -683,4 +683,37 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         public IEnumerable<ResponseS7Alarm>? Alarms { get; set; }
     }
+
+    public class ResponseS7TagWriteResult
+    {
+        public string? Name { get; set; }
+        public string? DataType { get; set; }
+        public string? OldValue { get; set; }
+        public string? NewValue { get; set; }
+        public bool Written { get; set; }
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+    }
+
+    public class ResponseS7TagWrites : ResponseMessage
+    {
+        public bool Written { get; set; }
+        public IEnumerable<ResponseS7TagWriteResult>? Results { get; set; }
+    }
+
+    public class ResponseServerVersion : ResponseMessage
+    {
+        public string? BuiltCommit { get; set; }
+        public string? BuiltCommitShort { get; set; }
+        public string? BuiltBranch { get; set; }
+        public string? BuiltCommitDate { get; set; }
+        public bool BuiltDirty { get; set; }
+        public string? CurrentSourceCommit { get; set; }
+        public bool? CurrentSourceDirty { get; set; }
+        public bool? BuiltMatchesCurrentSource { get; set; }
+        public string? RemoteMainCommit { get; set; }
+        public bool? CurrentSourceMatchesRemote { get; set; }
+        public string? RemoteCheckError { get; set; }
+        public string? RepoRoot { get; set; }
+    }
 }

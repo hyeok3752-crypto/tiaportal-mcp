@@ -214,6 +214,48 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        [McpServerTool(Name = "GetServerVersion", Title = "Get server build/version info", ReadOnly = true, OpenWorld = true, UseStructuredContent = true), Description("Reports which git commit this running TiaMcpServer.exe was actually built from (baked in at compile time), and - on demand only, never automatic - checks that against the source tree's current commit and against 'origin/main' on GitHub (a quick 'git ls-remote', no fetch/pull). Exists because a rebuilt exe can silently keep serving old code with no way to tell from outside it (see CHANGES.md 2026-10-09): builtMatchesCurrentSource=false means the exe needs rebuilding; currentSourceMatchesRemote=false means the source tree needs a 'git pull'. Requires git on PATH and (for the remote check) network access to GitHub; set checkRemote=false to skip that and stay fully offline.")]
+        public static ResponseServerVersion GetServerVersion(
+            [Description("checkRemote: also check origin/main on GitHub via 'git ls-remote' (default true). Set false to stay offline/local-only.")] bool checkRemote = true)
+        {
+            try
+            {
+                var v = TiaMcpServer.VersionInfo.Get(checkRemote);
+
+                var parts = new List<string> { $"built from {v.BuiltCommitShort} ({v.BuiltBranch})" };
+                if (v.BuiltDirty) parts.Add("built with uncommitted changes");
+                if (v.BuiltMatchesCurrentSource == false) parts.Add("STALE: source tree has moved on since this build");
+                if (v.CurrentSourceMatchesRemote == false) parts.Add("source tree is behind origin/main");
+                if (!string.IsNullOrEmpty(v.RemoteCheckError)) parts.Add($"remote check failed: {v.RemoteCheckError}");
+
+                return new ResponseServerVersion
+                {
+                    Message = string.Join("; ", parts),
+                    BuiltCommit = v.BuiltCommit,
+                    BuiltCommitShort = v.BuiltCommitShort,
+                    BuiltBranch = v.BuiltBranch,
+                    BuiltCommitDate = v.BuiltCommitDate,
+                    BuiltDirty = v.BuiltDirty,
+                    CurrentSourceCommit = v.CurrentSourceCommit,
+                    CurrentSourceDirty = v.CurrentSourceDirty,
+                    BuiltMatchesCurrentSource = v.BuiltMatchesCurrentSource,
+                    RemoteMainCommit = v.RemoteMainCommit,
+                    CurrentSourceMatchesRemote = v.CurrentSourceMatchesRemote,
+                    RemoteCheckError = v.RemoteCheckError,
+                    RepoRoot = v.RepoRoot,
+                    Meta = new JsonObject
+                    {
+                        ["timestamp"] = DateTime.Now,
+                        ["success"] = true
+                    }
+                };
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error retrieving server version info: {ex.Message}", ex);
+            }
+        }
+
         [McpServerTool(Name = "Doctor", Title = "Diagnose the TIA Portal environment", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Diagnose the TIA-Portal environment: connection, open project, active and installed TIA-Portal versions, Openness user group membership, and the managed export root folder (all Export* tools write inside it)")]
         public static ResponseDoctor Doctor()
         {
@@ -1320,6 +1362,53 @@ namespace TiaMcpServer.ModelContextProtocol
             catch (Exception ex) when (ex is not McpException)
             {
                 throw new McpException($"Unexpected error reading PLC tag values: {ex.Message}", ex);
+            }
+        }
+
+        [McpServerTool(Name = "WritePlcTagValueDirect", Title = "Write live PLC tag values (S7CommPlus)", Destructive = true, Idempotent = false, OpenWorld = false, UseStructuredContent = true), Description("EXPERIMENTAL and DESTRUCTIVE. Writes values straight onto the directly-connected CPU for the given symbolic tag names - requires ConnectPlcDirect first. PLCSIM ONLY - this tool has no way to tell a PLCSIM instance from a real line over this protocol, so YOU (the caller) are the only safety check for that; never call this with confirm=true against anything that might be a real/production CPU. Both confirm=true AND confirmPlcSimOnly=true are required to actually write - with either omitted/false, this returns a preview (current value + what would be written) and writes nothing. Supported types: Bool ('true'/'false'/'1'/'0'), Int, DInt, Real, Time (plain integer = milliseconds, or '<number><unit>' with unit ms/s/m/h/d e.g. '300ms'/'10s' - not the composite 'XdXXhXXm' form reads can produce). Refuses: more than 10 tags per call, and any tag name matching an F-DB/safety naming heuristic (best-effort only, not a guarantee - S7CommPlus exposes no real safety flag). Returns old and new value for each tag so a write can be verified by reading the response alone.")]
+        public static ResponseS7TagWrites WritePlcTagValueDirect(
+            [Description("tagNames: symbolic tag names to write, same dotted format as ReadPlcTagValuesDirect, e.g. [\"MainAssy.Mode.Dry_Run\"]")] string[] tagNames,
+            [Description("values: new value for each tag, same order/length as tagNames, e.g. [\"true\"]")] string[] values,
+            [Description("confirm: must be true to actually write (default false = preview only, writes nothing)")] bool confirm = false,
+            [Description("confirmPlcSimOnly: must be true to actually write - you are asserting the connected target is PLCSIM, never a real line (default false = preview only, writes nothing)")] bool confirmPlcSimOnly = false)
+        {
+            try
+            {
+                if (tagNames.Length != values.Length)
+                {
+                    throw new McpException($"tagNames ({tagNames.Length}) and values ({values.Length}) must be the same length.");
+                }
+
+                var writes = tagNames.Zip(values, (n, v) => (Name: n, Value: v));
+                var results = S7Diagnostics.WriteTagValues(writes, confirm, confirmPlcSimOnly);
+                var actuallyWritten = results.Any(r => r.Written);
+
+                return new ResponseS7TagWrites
+                {
+                    Message = actuallyWritten
+                        ? $"Wrote {results.Count(r => r.Success)}/{results.Count} tag(s)"
+                        : $"Preview only (confirm={confirm}, confirmPlcSimOnly={confirmPlcSimOnly}) - nothing written. {results.Count(r => r.Success)}/{results.Count} tag(s) resolved OK.",
+                    Written = actuallyWritten,
+                    Results = results.Select(r => new ResponseS7TagWriteResult
+                    {
+                        Name = r.Name,
+                        DataType = r.DataType,
+                        OldValue = r.OldValue,
+                        NewValue = r.NewValue,
+                        Written = r.Written,
+                        Success = r.Success,
+                        Error = r.Error
+                    }).ToList(),
+                    Meta = new JsonObject
+                    {
+                        ["timestamp"] = DateTime.Now,
+                        ["success"] = true
+                    }
+                };
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error writing PLC tag values: {ex.Message}", ex);
             }
         }
 
