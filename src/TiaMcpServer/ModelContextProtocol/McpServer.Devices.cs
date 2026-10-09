@@ -4,6 +4,7 @@ using Siemens.Engineering.SW.Blocks;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using TiaMcpServer.Siemens;
@@ -129,6 +130,63 @@ namespace TiaMcpServer.ModelContextProtocol
             catch (Exception ex) when (ex is not McpException)
             {
                 throw new McpException($"Unexpected error retrieving devices: {ex.Message}", ex);
+            }
+        }
+
+        #endregion
+
+        #region device master copies / hardware catalog search
+
+        [McpServerTool(Name = "GetDeviceMasterCopies", Title = "Get device master copies", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("List master copies (saved device/module templates) in the project's own library, for DeviceComposition.CreateFrom(MasterCopy)/DeviceItemComposition.CreateFrom(MasterCopy). Secondary route for building a device: prefer CreateDevice/CreateDeviceWithItem with a TypeIdentifier from FindHardwareCatalogEntries, which is verified to produce fully-populated devices (confirmed with a real CPU 1516-3 PN/DP, complete DP/PROFINET interfaces). Use this only if you specifically need to replicate a saved project template rather than a plain catalog part.")]
+        public static ResponseDeviceMasterCopies GetDeviceMasterCopies()
+        {
+            try
+            {
+                var paths = Portal.GetDeviceMasterCopyPaths();
+
+                return new ResponseDeviceMasterCopies
+                {
+                    Message = paths.Count > 0
+                        ? $"Found {paths.Count} master cop(y/ies) in the project library"
+                        : "No master copies in the project library - there's nothing to copy a fully-populated device from",
+                    Paths = paths,
+                    Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
+                };
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error retrieving device master copies: {ex.Message}", ex);
+            }
+        }
+
+        [McpServerTool(Name = "FindHardwareCatalogEntries", Title = "Search hardware catalog", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Diagnostic tool: search TIA Portal's hardware catalog (TiaPortal.HardwareCatalog.Find) by a text filter (e.g. article number, order number fragment, or product name like \"G120C\" or \"6ES7 510\"). Returns each match's TypeIdentifier/TypeIdentifierNormalized/ArticleNumber/Version. Live testing showed CreateDevice/CreateDeviceWithItem reject the TypeIdentifier format read off an already-placed device (GetDevices) with \"wrong type\" errors or produce an empty shell - the catalog's own TypeIdentifier string may be the format those creation APIs actually expect. Use this to find a creation-ready TypeIdentifier before calling CreateDevice/CreateDeviceWithItem.")]
+        public static ResponseHardwareCatalogEntries FindHardwareCatalogEntries(
+            [Description("Filter text, e.g. an article number or product name fragment")] string filter)
+        {
+            try
+            {
+                var entries = Portal.FindHardwareCatalogEntries(filter);
+
+                return new ResponseHardwareCatalogEntries
+                {
+                    Message = entries.Count > 0
+                        ? $"Found {entries.Count} catalog entr(y/ies) matching '{filter}'"
+                        : $"No catalog entries matched '{filter}'",
+                    Entries = entries.Select(e => new ResponseCatalogEntry
+                    {
+                        TypeName = e.TypeName,
+                        TypeIdentifier = e.TypeIdentifier,
+                        TypeIdentifierNormalized = e.TypeIdentifierNormalized,
+                        ArticleNumber = e.ArticleNumber,
+                        Version = e.Version,
+                        CatalogPath = e.CatalogPath
+                    }),
+                    Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
+                };
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error searching hardware catalog for '{filter}': {ex.Message}", ex);
             }
         }
 
