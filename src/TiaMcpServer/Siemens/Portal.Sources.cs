@@ -79,7 +79,7 @@ namespace TiaMcpServer.Siemens
                         type.Name,
                         maxChars,
                         dir => ExportTypeAsDocuments(softwarePath, typePath, dir).Files.Count > 0,
-                        dir => ExportXmlType(softwarePath, dir, typePath) is not null);
+                        dir => ExportXmlType(softwarePath, typePath, dir) is not null);
                 },
                 ("softwarePath", softwarePath), ("typePath", typePath), ("format", format));
         }
