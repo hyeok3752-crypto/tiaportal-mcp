@@ -264,8 +264,12 @@ adds, not bug fixes, and upstream may already cover the same ground differently)
 - [ ] `d4baaa8`/`768d097`/`b021c6d` - cross-reference tools: upstream already has
   `GetTypeCrossReferences`/`GetBlockCrossReferences` per the plan context - check its own error
   handling for "no project open" before assuming the old fork's fix is still needed.
-- [ ] `dcf8e0f`/`34275ab` - `GetOnlineState`/`GoOnline`/`GoOffline`: check whether upstream has
-  equivalent online-mode tools before porting.
+Also ported since (confirmed absent from upstream, user explicitly approved porting a non-bug-fix
+feature for this one): `GetOnlineState`/`GoOnline`/`GoOffline` (from `dcf8e0f`) - the engineering
+station's own online/diagnostic connection, independent of PLC Run/Stop state. Live-tested against
+the real "claude for tia" PLCSIM-only test project: state correctly tracked Offline ->
+Incompatible (once PLCSIM was started with a mismatched CPU type) -> Offline again after
+GoOffline; GoOnline's own TIA-native error messages passed through faithfully in both cases.
 
 Remaining commits in the range are docs-only (`CHANGES.md`/`TODO.md`/`README.md` entries,
 `.gitignore` tweaks) and don't need porting - the old fork's own files aren't carried over, only
