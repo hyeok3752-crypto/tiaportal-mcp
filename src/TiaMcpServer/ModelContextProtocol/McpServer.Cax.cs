@@ -33,7 +33,9 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "ImportCax", Title = "Import CAx (AutomationML)", Destructive = true, Idempotent = false, OpenWorld = false), Description("Import an AutomationML (.aml) file (e.g. hand-edited in EPLAN after an ExportCax) back into the project - can restructure hardware config. Openness has no preview/dry-run for this, so confirm=true is required to actually run it; get an explicit go-ahead and test against a disposable/test project first, not a real production project. mergeOption controls what happens when the AML content conflicts with what's already in the project: 'MoveToParkingLot' (default, safest - conflicting items go to TIA's Parking Lot for a human to resolve instead of being silently applied), 'OverwriteTiaDevice' (conflicting TIA devices get overwritten with the AML content), or 'RetainTiaDevice' (conflicting AML content is discarded, TIA's existing devices win).")]
+        [WriteTool]
+        [McpServerTool(Name = "ImportCax", Title = "Import CAx (AutomationML)", Destructive = true, Idempotent = false, OpenWorld = false),
+         Description("Import an AutomationML (.aml) file (e.g. hand-edited in EPLAN after an ExportCax) back into the project - can restructure hardware config. Openness has no preview/dry-run for this, so confirm=true is required to actually run it; get an explicit go-ahead and test against a disposable/test project first, not a real production project. mergeOption controls what happens when the AML content conflicts with what's already in the project: 'MoveToParkingLot' (default, safest - conflicting items go to TIA's Parking Lot for a human to resolve instead of being silently applied), 'OverwriteTiaDevice' (conflicting TIA devices get overwritten with the AML content), or 'RetainTiaDevice' (conflicting AML content is discarded, TIA's existing devices win).")]
         public static ResponseCaxTransfer ImportCax(
             [Description("importPath: full path to the .aml file to import")] string importPath,
             [Description("confirm: must be explicitly true to actually import - false (default) refuses with an explanation instead of importing, since there's no preview available")] bool confirm = false,
@@ -44,7 +46,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 throw new McpException($"Invalid mergeOption '{mergeOption}' - must be one of: MoveToParkingLot, OverwriteTiaDevice, RetainTiaDevice");
             }
 
-            try
+            return Guarded(nameof(ImportCax), () =>
             {
                 var (success, logText, logPath) = Portal.ImportCax(importPath, parsedOption, confirm);
 
@@ -62,15 +64,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     LogText = shownLog,
                     Meta = Ok(new JsonObject { ["success"] = success })
                 };
-            }
-            catch (PortalException pex)
-            {
-                throw new McpException(pex.Message, pex);
-            }
-            catch (Exception ex) when (ex is not McpException)
-            {
-                throw new McpException($"Unexpected error importing CAx from '{importPath}': {ex.Message}", ex);
-            }
+            });
         }
 
         private static ResponseCaxTransfer BuildCaxResponse(TransferResult result, string actionDescription)
