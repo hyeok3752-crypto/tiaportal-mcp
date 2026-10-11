@@ -133,6 +133,44 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        [McpServerTool(Name = "GetGsdDependencies", Title = "Get GSD device dependencies", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("List every third-party (GSD-based) device/device item in the project's hardware config, with its GSD identity (GsdId/GsdName/GsdType, Profibus/Profinet) - e.g. before moving a project to another machine, check this list against what's installed there. Only sees devices TIA already loaded successfully; a missing GSD can make TIA fail to instantiate the device at all, in which case it won't show up here either - if GetDevices/GetProject come back empty right after a successful Connect, that's a stronger sign of a missing GSD than an empty result from this tool.")]
+        public static ResponseGsdDependencies GetGsdDependencies(
+            [Description("devicePath: optional - scope the scan to a single device (its name, e.g. 'S7-1500/ET200MP station_1'); omit to scan every device in the project")] string? devicePath = null)
+        {
+            try
+            {
+                var list = Portal.GetGsdDependencies(devicePath);
+
+                var responseList = list.Select(g => new ResponseGsdReference
+                {
+                    Path = g.Path,
+                    Name = g.Name,
+                    GsdId = g.GsdId,
+                    GsdName = g.GsdName,
+                    GsdType = g.GsdType,
+                    IsProfibus = g.IsProfibus,
+                    IsProfinet = g.IsProfinet
+                }).ToList();
+
+                return new ResponseGsdDependencies
+                {
+                    Message = responseList.Count > 0
+                        ? $"Found {responseList.Count} GSD-based device(s)"
+                        : "No GSD-based devices found - every device in scope is a native Siemens catalog device",
+                    Items = responseList,
+                    Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
+                };
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error scanning for GSD dependencies: {ex.Message}", ex);
+            }
+        }
+
         #endregion
 
         #region device master copies / hardware catalog search

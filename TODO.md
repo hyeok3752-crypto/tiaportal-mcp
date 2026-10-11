@@ -241,6 +241,10 @@ Already confirmed and reapplied where upstream didn't independently fix the same
 devices" + device-name-with-'/' bugs, assembly-resolver resilience under restricted hosts
 (Claude Desktop's child-process launch).
 
+Also ported since (self-contained, confirmed absent from upstream, live-tested): GSD dependency
+listing (`GetGsdDependencies`/`CollectGsdInfo*`, from `ec69fba`) - found 792 GSD-based
+devices/sub-items on the live test project.
+
 Not yet checked - lower priority / needs a scoping decision before porting (these are feature
 adds, not bug fixes, and upstream may already cover the same ground differently):
 - [ ] `6e32d8b` - "strip synthetic tree-root labels from block/type paths": old fork's own
@@ -248,9 +252,6 @@ adds, not bug fixes, and upstream may already cover the same ground differently)
   (`Portal.Blocks.cs`/`Portal.Types.cs`) with a different implementation - check whether an
   analogous "tree label doesn't match real group name" bug exists there before porting this fix
   verbatim; it may not apply at all.
-- [ ] `ec69fba` - GSD dependency listing (`GetGsdDependencies`/`CollectGsdInfo*`): deliberately left
-  out of the network-topology port (out of scope for that commit) - confirmed via grep still
-  absent from upstream. Self-contained, could be ported as its own small commit.
 - [ ] `e295be4`/`bde9080`/`3ab26f7` - multi-instance `Connect` rejection messages +
   `ListTiaPortalInstances`: upstream's own `Connect`/`GetPortals` already exist with a different
   multi-instance model (see `McpServer.cs` - `Connect(portalId)`, stateless per-request) - check

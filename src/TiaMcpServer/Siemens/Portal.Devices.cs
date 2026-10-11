@@ -92,6 +92,97 @@ namespace TiaMcpServer.Siemens
 
         }
 
+        // Lists every third-party (GSD-based) device/device item referenced by this project's
+        // hardware config - e.g. non-Siemens PROFINET/PROFIBUS IO devices - along with the GSD
+        // identity (GsdId/GsdName) needed to pre-install the same GSD file on another machine
+        // before opening this project there. Scoped to one device if devicePath is given,
+        // otherwise scans every device in the project. Only sees devices TIA already loaded
+        // successfully - a missing GSD can make TIA fail to instantiate the device at all, in
+        // which case it won't show up here either.
+        public List<GsdReference> GetGsdDependencies(string? devicePath = null)
+        {
+            _logger?.LogInformation("Scanning for GSD-based device dependencies...");
+
+            if (IsProjectNull())
+            {
+                throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal");
+            }
+
+            var devices = new List<Device>();
+            if (string.IsNullOrEmpty(devicePath))
+            {
+                devices.AddRange(GetDevices());
+            }
+            else
+            {
+                var device = GetDeviceByPath(devicePath)
+                    ?? throw new PortalException(PortalErrorCode.NotFound, $"Device not found at '{devicePath}'");
+                devices.Add(device);
+            }
+
+            var results = new List<GsdReference>();
+            foreach (var device in devices)
+            {
+                CollectGsdInfo(device, results);
+            }
+
+            return results;
+        }
+
+        private static void CollectGsdInfo(Device device, List<GsdReference> results)
+        {
+            var gsdDevice = device.GetService<GsdDevice>();
+            if (gsdDevice != null)
+            {
+                results.Add(new GsdReference
+                {
+                    Path = device.Name,
+                    Name = device.Name,
+                    GsdId = gsdDevice.GsdId,
+                    GsdName = gsdDevice.GsdName,
+                    GsdType = gsdDevice.GsdType,
+                    IsProfibus = gsdDevice.IsProfibus,
+                    IsProfinet = gsdDevice.IsProfinet
+                });
+            }
+
+            if (device.DeviceItems != null)
+            {
+                foreach (var item in device.DeviceItems)
+                {
+                    CollectGsdInfoFromDeviceItem(item, device.Name, results);
+                }
+            }
+        }
+
+        private static void CollectGsdInfoFromDeviceItem(DeviceItem deviceItem, string parentPath, List<GsdReference> results)
+        {
+            var path = $"{parentPath}/{deviceItem.Name}";
+
+            var gsdItem = deviceItem.GetService<GsdDeviceItem>();
+            if (gsdItem != null)
+            {
+                results.Add(new GsdReference
+                {
+                    Path = path,
+                    Name = deviceItem.Name,
+                    GsdId = gsdItem.GsdId,
+                    GsdName = gsdItem.GsdName,
+                    GsdType = gsdItem.GsdType,
+                    IsProfibus = gsdItem.IsProfibus,
+                    IsProfinet = gsdItem.IsProfinet
+                });
+            }
+
+            if (deviceItem.DeviceItems != null)
+            {
+                foreach (var child in deviceItem.DeviceItems)
+                {
+                    CollectGsdInfoFromDeviceItem(child, path, results);
+                }
+            }
+        }
+
         #endregion
 
         #region device master copies / hardware catalog search
@@ -438,5 +529,18 @@ namespace TiaMcpServer.Siemens
         public string? ArticleNumber { get; set; }
         public string? Version { get; set; }
         public string? CatalogPath { get; set; }
+    }
+
+    // A single third-party (GSD-based) device or device item found in a project's hardware
+    // config, with the catalog identity needed to install the matching GSD file elsewhere.
+    public class GsdReference
+    {
+        public string Path { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string? GsdId { get; set; }
+        public string? GsdName { get; set; }
+        public string? GsdType { get; set; }
+        public bool IsProfibus { get; set; }
+        public bool IsProfinet { get; set; }
     }
 }
