@@ -660,7 +660,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
                     var sameGroup = string.Equals(
                         Parent(existing.Path),
-                        StripLeadingSystemFolder(groupPath),
+                        StripLeadingSystemFolder(groupPath, isType),
                         StringComparison.OrdinalIgnoreCase);
 
                     items.Add(new ResponseImportPreviewItem
@@ -724,17 +724,32 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         /// <summary>
-        /// A groupPath copied from a preservePath export starts with the localised system folder
-        /// ('PLC data types', 'Program blocks'), which the resolved paths do not carry.
+        /// A groupPath copied from a preservePath export starts with the system folder ('PLC data
+        /// types', 'Program blocks'), which the resolved paths from ResolveObjectPath do not
+        /// carry - strip it so both sides compare equal. A groupPath passed directly (no system
+        /// folder prefix, e.g. just "0_OBs") has nothing to strip and must be returned unchanged -
+        /// live-tested: the previous version blanked ANY groupPath without a '/' to "", so a
+        /// same-group import (the common case: re-importing a block into the group it already
+        /// lives in, one segment deep) always compared unequal to the resolved existing path and
+        /// was misreported as a conflict instead of a plain overwrite.
         /// </summary>
-        private static string StripLeadingSystemFolder(string groupPath)
+        private static string StripLeadingSystemFolder(string groupPath, bool isType)
         {
-            if (string.IsNullOrEmpty(groupPath) || !groupPath.Contains("/"))
+            if (string.IsNullOrEmpty(groupPath))
             {
                 return string.Empty;
             }
 
-            return groupPath.Substring(groupPath.IndexOf('/') + 1);
+            var systemFolder = isType ? "PLC data types" : "Program blocks";
+            var slash = groupPath.IndexOf('/');
+            var firstSegment = slash < 0 ? groupPath : groupPath.Substring(0, slash);
+
+            if (!string.Equals(firstSegment, systemFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                return groupPath;
+            }
+
+            return slash < 0 ? string.Empty : groupPath.Substring(slash + 1);
         }
 
         #endregion

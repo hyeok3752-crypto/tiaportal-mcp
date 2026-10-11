@@ -93,16 +93,22 @@ namespace TiaMcpServer.ModelContextProtocol
 
                 if (failed)
                 {
-                    // The message text is what a client surfaces, so name the first few offenders
-                    // rather than making the caller re-query to find out what broke.
+                    // Live-tested: throwing here (as this used to) discards the fully-built
+                    // response - a caller debugging a real compile failure only ever saw up to 5
+                    // offender lines in the exception text, never the full Messages[]/ErrorCount
+                    // this method already has in hand. An error-fixing loop needs the actual
+                    // locations, so return the structured result (success=false in Meta) exactly
+                    // like the success path, instead of throwing away the detail into a truncated
+                    // exception string - matching the Failures-surfacing pattern used by the
+                    // export tools (ExportXmlBlocks/ExportXmlTypes/ExportBlocksAsDocuments) rather
+                    // than treating "the compile reported errors" as an exceptional condition.
                     var offenders = messages
                         .Where(m => string.Equals(m.State, nameof(CompilerResultState.Error), StringComparison.OrdinalIgnoreCase))
                         .Take(5)
                         .Select(m => $"{m.Path}: {m.Description}");
 
-                    throw new McpException(
-                        $"Compiling '{softwarePath}' failed with {result.ErrorCount} error(s). " +
-                        string.Join(" | ", offenders));
+                    response.Message = $"Compiling '{softwarePath}' failed with {result.ErrorCount} error(s). " +
+                                        string.Join(" | ", offenders);
                 }
 
                 return response;
