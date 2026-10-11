@@ -1841,6 +1841,440 @@ Use the DeleteExternalSourceGroup tool with these parameters:
 
         #endregion
 
+        #region Direct PLC (S7CommPlus) Templates
+
+        [McpServerPrompt(Name = "ConnectPlcDirect"), Description("Open a direct S7CommPlus connection to a PLC, bypassing Openness")]
+        public static string ConnectPlcDirect(string ipAddress, string username = "", string password = "")
+        {
+            return $@"Open a direct network connection (S7CommPlus) straight to a live CPU, bypassing TIA Portal/Openness entirely.
+
+Common parameter values:
+- ipAddress: the PLC's PROFINET interface IP, or the PLCSIM virtual adapter IP{OptionalParameter("username", username)}{OptionalParameter("password", password)}
+
+Use the ConnectPlcDirect tool with these parameters:
+- ipAddress: {ipAddress}";
+        }
+
+        [McpServerPrompt(Name = "DisconnectPlcDirect"), Description("Close the direct S7CommPlus PLC connection")]
+        public static string DisconnectPlcDirect()
+        {
+            return @"Close the direct S7CommPlus connection opened by ConnectPlcDirect.
+
+Use the DisconnectPlcDirect tool (it takes no parameters).";
+        }
+
+        [McpServerPrompt(Name = "BrowsePlcTagsDirect"), Description("List symbolic tags the directly-connected CPU exposes")]
+        public static string BrowsePlcTagsDirect(string regexName = "")
+        {
+            return $@"Browse the symbolic tags exposed by the directly-connected CPU (requires ConnectPlcDirect first).
+
+Common parameter values:
+- regexName: a case-insensitive regex to filter tag names, e.g. 'MainAssy' - pass one rather than browsing unfiltered, a real project can expose hundreds of thousands of tags
+
+Use the BrowsePlcTagsDirect tool with these parameters:{OptionalParameter("regexName", regexName)}";
+        }
+
+        [McpServerPrompt(Name = "ReadPlcTagValuesDirect"), Description("Read live tag values off the directly-connected CPU")]
+        public static string ReadPlcTagValuesDirect(string tagNames)
+        {
+            return $@"Read current live values straight off the directly-connected CPU (requires ConnectPlcDirect first).
+
+Common parameter values:
+- tagNames: a JSON array of symbolic tag names, e.g. [""MainAssy.Mode.Dry_Run"", ""MyGlobalDb.Counter""]
+
+Use the ReadPlcTagValuesDirect tool with these parameters:
+- tagNames: {tagNames}";
+        }
+
+        [McpServerPrompt(Name = "WritePlcTagValueDirect"), Description("Write live tag values onto the directly-connected CPU, PLCSIM only")]
+        public static string WritePlcTagValueDirect(string tagNames, string values, string confirm = "false", string confirmPlcSimOnly = "false")
+        {
+            return $@"Write values straight onto the directly-connected CPU (requires ConnectPlcDirect first). PLCSIM ONLY - never pass confirm=true against anything that might be a real/production CPU.
+
+Common parameter values:
+- tagNames: a JSON array of symbolic tag names, same format as ReadPlcTagValuesDirect, e.g. [""MainAssy.Mode.Dry_Run""]
+- values: a JSON array of new values, same order/length as tagNames, e.g. [""true""]
+- confirm: must be true to actually write - false (default) only previews what would be written
+- confirmPlcSimOnly: must also be true - you are asserting the connected target is PLCSIM, never a real line
+
+Use the WritePlcTagValueDirect tool with these parameters:
+- tagNames: {tagNames}
+- values: {values}
+- confirm: {NormalizeBool(confirm)}
+- confirmPlcSimOnly: {NormalizeBool(confirmPlcSimOnly)}";
+        }
+
+        [McpServerPrompt(Name = "GetActivePlcAlarmsDirect"), Description("Snapshot active alarms off the directly-connected CPU")]
+        public static string GetActivePlcAlarmsDirect(string languageId = "1033")
+        {
+            return $@"Snapshot currently active and not-yet-cleared alarms straight off the directly-connected CPU (requires ConnectPlcDirect first). One-time poll, not a live subscription.
+
+Common parameter values:
+- languageId: a Windows LCID for the alarm text language, default 1033 (en-US), e.g. 1042 for ko-KR
+
+Use the GetActivePlcAlarmsDirect tool with these parameters:{OptionalParameter("languageId", languageId)}";
+        }
+
+        #endregion
+
+        #region Network Topology Templates
+
+        [McpServerPrompt(Name = "GetSubnets"), Description("List every subnet in the project")]
+        public static string GetSubnets()
+        {
+            return @"Get a list of every subnet in the project, with its type and connected devices/IO systems.
+
+Use the GetSubnets tool (it takes no parameters).";
+        }
+
+        [McpServerPrompt(Name = "GetNetworkInterfaceInfo"), Description("Get topology info for a device's network interface")]
+        public static string GetNetworkInterfaceInfo(string path)
+        {
+            return $@"Get network topology info for a device's network interface - nodes, connected subnet, IO role, per-port wiring.
+
+Common parameter values:
+- path: a device or device item path, e.g. 'PLC_1' - doesn't need to be the exact interface DeviceItem, it auto-searches nested DeviceItems
+
+Use the GetNetworkInterfaceInfo tool with these parameters:
+- path: {path}";
+        }
+
+        [McpServerPrompt(Name = "SetIpAddress"), Description("Set IP address/subnet mask on a device's network interface")]
+        public static string SetIpAddress(string path, string ipAddress, string subnetMask, string routerAddress = "")
+        {
+            return $@"Set IP address/subnet mask/router on a device's network interface. Project metadata only - nothing reaches real hardware until compiled and downloaded.
+
+Common parameter values:
+- path: same auto-resolving rules as GetNetworkInterfaceInfo
+- ipAddress: e.g. '192.168.0.1'
+- subnetMask: e.g. '255.255.255.0'{OptionalParameter("routerAddress", routerAddress)}
+
+Use the SetIpAddress tool with these parameters:
+- path: {path}
+- ipAddress: {ipAddress}
+- subnetMask: {subnetMask}";
+        }
+
+        [McpServerPrompt(Name = "ConnectToSubnet"), Description("Connect a device's network interface to a named subnet")]
+        public static string ConnectToSubnet(string path, string subnetName)
+        {
+            return $@"Connect a device's network interface to a named subnet (must already exist - see GetSubnets).
+
+Common parameter values:
+- path: same auto-resolving rules as GetNetworkInterfaceInfo
+- subnetName: an existing subnet name, from GetSubnets
+
+Use the ConnectToSubnet tool with these parameters:
+- path: {path}
+- subnetName: {subnetName}";
+        }
+
+        [McpServerPrompt(Name = "DisconnectFromSubnet"), Description("Disconnect a device's network interface from its subnet")]
+        public static string DisconnectFromSubnet(string path)
+        {
+            return $@"Disconnect a device's network interface from its subnet.
+
+Common parameter values:
+- path: same auto-resolving rules as GetNetworkInterfaceInfo
+
+Use the DisconnectFromSubnet tool with these parameters:
+- path: {path}";
+        }
+
+        #endregion
+
+        #region Device Write Templates
+
+        [McpServerPrompt(Name = "CreateDevice"), Description("Create a new single-item hardware device")]
+        public static string CreateDevice(string typeIdentifier, string name, string groupPath = "")
+        {
+            return $@"Create a new single-item hardware device in the project.
+
+Common parameter values:
+- typeIdentifier: a creation-ready catalog TypeIdentifier from FindHardwareCatalogEntries, e.g. 'OrderNumber:6SL3210-1KE11-8AF2/4.7.14'
+- name: name for the new device{OptionalParameter("groupPath", groupPath)}
+
+Use the CreateDevice tool with these parameters:
+- typeIdentifier: {typeIdentifier}
+- name: {name}";
+        }
+
+        [McpServerPrompt(Name = "CreateDeviceWithItem"), Description("Create a hardware device with a station and first sub-item")]
+        public static string CreateDeviceWithItem(string typeIdentifier, string name, string deviceItemName, string groupPath = "")
+        {
+            return $@"Create a new hardware device that has both a station-level name and a first sub-item name in one call - e.g. a CPU station or a drive.
+
+Common parameter values:
+- typeIdentifier: a creation-ready catalog TypeIdentifier from FindHardwareCatalogEntries, e.g. 'OrderNumber:6ES7 516-3AN01-0AB0/V2.1'
+- name: name for the new device station - this does not become the queryable Device.Name
+- deviceItemName: name for the first sub-item - this is what the device is actually found under{OptionalParameter("groupPath", groupPath)}
+
+Use the CreateDeviceWithItem tool with these parameters:
+- typeIdentifier: {typeIdentifier}
+- name: {name}
+- deviceItemName: {deviceItemName}";
+        }
+
+        [McpServerPrompt(Name = "DeleteDevice"), Description("Delete a hardware device from the project, dry-run by default")]
+        public static string DeleteDevice(string devicePath, string confirm = "false")
+        {
+            return $@"Delete a hardware device from the project. Dry-run by default - call once to preview, then again with confirm=true to actually delete.
+
+Common parameter values:
+- devicePath: full path to the device
+- confirm: must be true to actually delete - false (default) only previews
+
+Use the DeleteDevice tool with these parameters:
+- devicePath: {devicePath}
+- confirm: {NormalizeBool(confirm)}";
+        }
+
+        [McpServerPrompt(Name = "CreateDeviceGroup"), Description("Create a new device group (folder) in the project")]
+        public static string CreateDeviceGroup(string parentGroupPath, string name)
+        {
+            return $@"Create a new device group (folder) in the project, for organizing devices.
+
+Common parameter values:
+- parentGroupPath: path to the parent group, e.g. 'Group/Subgroup' (empty for the project root)
+- name: name for the new group
+
+Use the CreateDeviceGroup tool with these parameters:
+- parentGroupPath: {parentGroupPath}
+- name: {name}";
+        }
+
+        [McpServerPrompt(Name = "DeleteDeviceGroup"), Description("Delete a device group and every device inside it")]
+        public static string DeleteDeviceGroup(string groupPath)
+        {
+            return $@"Delete a device group (folder) from the project - also deletes every device inside it.
+
+Common parameter values:
+- groupPath: full path to the group, e.g. 'Group/Subgroup'
+
+Use the DeleteDeviceGroup tool with these parameters:
+- groupPath: {groupPath}";
+        }
+
+        #endregion
+
+        #region Device Catalog Templates
+
+        [McpServerPrompt(Name = "GetGsdDependencies"), Description("List third-party GSD-based devices in the project")]
+        public static string GetGsdDependencies(string devicePath = "")
+        {
+            return $@"List every third-party (GSD-based) device/device item in the project's hardware config, with its GSD identity.
+
+Common parameter values:{OptionalParameter("devicePath", devicePath)}
+
+Use the GetGsdDependencies tool with these parameters:{OptionalParameter("devicePath", devicePath)}";
+        }
+
+        [McpServerPrompt(Name = "GetDeviceMasterCopies"), Description("List master copies in the project's own library")]
+        public static string GetDeviceMasterCopies()
+        {
+            return @"List master copies (saved device/module templates) in the project's own library.
+
+Use the GetDeviceMasterCopies tool (it takes no parameters).";
+        }
+
+        [McpServerPrompt(Name = "FindHardwareCatalogEntries"), Description("Search the TIA Portal hardware catalog by text")]
+        public static string FindHardwareCatalogEntries(string filter)
+        {
+            return $@"Search TIA Portal's hardware catalog by a text filter, to find a creation-ready TypeIdentifier for CreateDevice/CreateDeviceWithItem.
+
+Common parameter values:
+- filter: an article number or product name fragment, e.g. 'G120C' or '6ES7 510'
+
+Use the FindHardwareCatalogEntries tool with these parameters:
+- filter: {filter}";
+        }
+
+        #endregion
+
+        #region CAx Templates
+
+        [McpServerPrompt(Name = "ExportCax"), Description("Export the project's hardware config as AutomationML")]
+        public static string ExportCax(string exportPath, string devicePath = "")
+        {
+            return $@"Export the project's hardware config as an AutomationML (.aml) file, for round-tripping with an ECAD tool like EPLAN.
+
+Common parameter values:
+- exportPath: directory to write the .aml file into{OptionalParameter("devicePath", devicePath)}
+
+Use the ExportCax tool with these parameters:
+- exportPath: {exportPath}";
+        }
+
+        [McpServerPrompt(Name = "ImportCax"), Description("Import an AutomationML file back into the project")]
+        public static string ImportCax(string importPath, string confirm = "false", string mergeOption = "MoveToParkingLot")
+        {
+            return $@"Import an AutomationML (.aml) file back into the project - can restructure hardware config. No preview available, so test against a disposable project first.
+
+Common parameter values:
+- importPath: full path to the .aml file to import
+- confirm: must be true to actually import
+- mergeOption: 'MoveToParkingLot' (default, safest), 'OverwriteTiaDevice', or 'RetainTiaDevice'
+
+Use the ImportCax tool with these parameters:
+- importPath: {importPath}
+- confirm: {NormalizeBool(confirm)}";
+        }
+
+        #endregion
+
+        #region Online Connection Templates
+
+        [McpServerPrompt(Name = "GetOnlineState"), Description("Get the engineering station's online connection state")]
+        public static string GetOnlineState(string path)
+        {
+            return $@"Get the engineering station's online connection state for a device or device item. Independent of PLC Run/Stop state.
+
+Common parameter values:
+- path: path in the project structure to the device or device item
+
+Use the GetOnlineState tool with these parameters:
+- path: {path}";
+        }
+
+        [McpServerPrompt(Name = "GoOnline"), Description("Establish the engineering station's online connection")]
+        public static string GoOnline(string path)
+        {
+            return $@"Establish the engineering station's online connection to a device or device item for diagnostics/monitoring. Does not start, stop, or otherwise command the PLC.
+
+Common parameter values:
+- path: path in the project structure to the device or device item
+
+Use the GoOnline tool with these parameters:
+- path: {path}";
+        }
+
+        [McpServerPrompt(Name = "GoOffline"), Description("Disconnect the engineering station's online connection")]
+        public static string GoOffline(string path)
+        {
+            return $@"Disconnect the engineering station's online connection to a device or device item. Does not stop the PLC.
+
+Common parameter values:
+- path: path in the project structure to the device or device item
+
+Use the GoOffline tool with these parameters:
+- path: {path}";
+        }
+
+        #endregion
+
+        #region PRONETA Templates
+
+        [McpServerPrompt(Name = "CompareNetworkCsv"), Description("Compare a PRONETA device CSV against the open project")]
+        public static string CompareNetworkCsv(string csvPath)
+        {
+            return $@"Compare a PRONETA 'Device Table (CSV)' export against the currently open project's devices. Read-only - never writes anything.
+
+Common parameter values:
+- csvPath: full path to the PRONETA CSV export file (with 'Include device details' checked)
+
+Use the CompareNetworkCsv tool with these parameters:
+- csvPath: {csvPath}";
+        }
+
+        #endregion
+
+        #region HMI Templates
+
+        [McpServerPrompt(Name = "GetHmiTagTables"), Description("List HMI tag tables of a Unified Comfort/Advanced panel")]
+        public static string GetHmiTagTables(string softwarePath, string regexName = "")
+        {
+            return $@"Get a list of HMI tag tables from a device's HMI software (Unified Comfort/Advanced Panels only).
+
+Common parameter values:
+- softwarePath: path to the HMI device/device item, e.g. 'HMI_1/HMI_RT_1'{OptionalParameter("regexName", regexName)}
+
+Use the GetHmiTagTables tool with these parameters:
+- softwarePath: {softwarePath}";
+        }
+
+        [McpServerPrompt(Name = "GetHmiTags"), Description("List tags from a specific HMI tag table")]
+        public static string GetHmiTags(string softwarePath, string tagTablePath, string regexName = "")
+        {
+            return $@"Get a list of tags from a specific HMI tag table (Unified Comfort/Advanced Panels only), including address/PLC-link info.
+
+Common parameter values:
+- softwarePath: path to the HMI device/device item, e.g. 'HMI_1/HMI_RT_1'
+- tagTablePath: full path to the HMI tag table{OptionalParameter("regexName", regexName)}
+
+Use the GetHmiTags tool with these parameters:
+- softwarePath: {softwarePath}
+- tagTablePath: {tagTablePath}";
+        }
+
+        [McpServerPrompt(Name = "GetHmiScreens"), Description("List screens in a Unified Comfort/Advanced panel")]
+        public static string GetHmiScreens(string softwarePath, string regexName = "")
+        {
+            return $@"Get a list of screens in a device's HMI software (Unified Comfort/Advanced Panels only).
+
+Common parameter values:
+- softwarePath: path to the HMI device/device item, e.g. 'HMI_1/HMI_RT_1'{OptionalParameter("regexName", regexName)}
+
+Use the GetHmiScreens tool with these parameters:
+- softwarePath: {softwarePath}";
+        }
+
+        [McpServerPrompt(Name = "GetHmiDiscreteAlarms"), Description("List discrete alarms of a Unified Comfort/Advanced panel")]
+        public static string GetHmiDiscreteAlarms(string softwarePath, string regexName = "")
+        {
+            return $@"Get a list of discrete (bit-triggered) alarms from a device's HMI software (Unified Comfort/Advanced Panels only).
+
+Common parameter values:
+- softwarePath: path to the HMI device/device item, e.g. 'HMI_1/HMI_RT_1'{OptionalParameter("regexName", regexName)}
+
+Use the GetHmiDiscreteAlarms tool with these parameters:
+- softwarePath: {softwarePath}";
+        }
+
+        [McpServerPrompt(Name = "GetHmiAnalogAlarms"), Description("List analog alarms of a Unified Comfort/Advanced panel")]
+        public static string GetHmiAnalogAlarms(string softwarePath, string regexName = "")
+        {
+            return $@"Get a list of analog (limit-triggered) alarms from a device's HMI software (Unified Comfort/Advanced Panels only).
+
+Common parameter values:
+- softwarePath: path to the HMI device/device item, e.g. 'HMI_1/HMI_RT_1'{OptionalParameter("regexName", regexName)}
+
+Use the GetHmiAnalogAlarms tool with these parameters:
+- softwarePath: {softwarePath}";
+        }
+
+        [McpServerPrompt(Name = "GetHmiTextLists"), Description("List text list names of a Unified Comfort/Advanced panel")]
+        public static string GetHmiTextLists(string softwarePath, string regexName = "")
+        {
+            return $@"Get a list of text list names from a device's HMI software (Unified Comfort/Advanced Panels only). Names only, no entry values.
+
+Common parameter values:
+- softwarePath: path to the HMI device/device item, e.g. 'HMI_1/HMI_RT_1'{OptionalParameter("regexName", regexName)}
+
+Use the GetHmiTextLists tool with these parameters:
+- softwarePath: {softwarePath}";
+        }
+
+        #endregion
+
+        #region Network Source Templates
+
+        [McpServerPrompt(Name = "GetNetworkSource"), Description("Read one block network as SCL text")]
+        public static string GetNetworkSource(string softwarePath, string blockPath, string networkIndex = "-1")
+        {
+            return $@"Read a block's networks as SCL text - the only way to get readable source out of a mixed LAD+SCL block.
+
+Common parameter values:
+- softwarePath: path to the PLC software
+- blockPath: root-relative path of the block, e.g. '0_OBs/Main'
+- networkIndex: 0-based network index to read; -1 (default) reads all networks
+
+Use the GetNetworkSource tool with these parameters:
+- softwarePath: {softwarePath}
+- blockPath: {blockPath}{OptionalParameter("networkIndex", networkIndex == "-1" ? "" : networkIndex)}";
+        }
+
+        #endregion
+
         // Optional prompt arguments arrive as empty text when the user leaves them out; only real
         // values are passed on to the tool, so the tool's own default applies otherwise.
         private static string OptionalParameter(string name, string? value)
