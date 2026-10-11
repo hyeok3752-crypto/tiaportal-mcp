@@ -231,3 +231,41 @@ the gap is explicit rather than implied.
 - [ ] Validate enum mapping for `importOption` (Override/None; extend if environment exposes more values).
 - [ ] Verify placement into `groupPath` (root vs. nested groups) and behavior when group does not exist.
 - [ ] Add docs pages under `docs/tools/` for import-from-documents tools; include file discovery rules (.s7dcl/.s7res), name derivation, and option mapping.
+
+## Rebase audit backlog (legacy-fork-main → upstream structure)
+
+Tracking which of `legacy-fork-main`'s ~44 unique commits (fixes/features this fork built before
+rebasing onto upstream's current structure) still need checking against upstream's current code.
+Already confirmed and reapplied where upstream didn't independently fix the same issue:
+`GetAttributeList` JSON-serialization sanitization, `GetDevices`/`GetDeviceByPath` "Ungrouped
+devices" + device-name-with-'/' bugs, assembly-resolver resilience under restricted hosts
+(Claude Desktop's child-process launch).
+
+Not yet checked - lower priority / needs a scoping decision before porting (these are feature
+adds, not bug fixes, and upstream may already cover the same ground differently):
+- [ ] `6e32d8b` - "strip synthetic tree-root labels from block/type paths": old fork's own
+  `GetSoftwareTree`-shaped path bug. Upstream has its own block/type path resolution
+  (`Portal.Blocks.cs`/`Portal.Types.cs`) with a different implementation - check whether an
+  analogous "tree label doesn't match real group name" bug exists there before porting this fix
+  verbatim; it may not apply at all.
+- [ ] `ec69fba` - GSD dependency listing (`GetGsdDependencies`/`CollectGsdInfo*`): deliberately left
+  out of the network-topology port (out of scope for that commit) - confirmed via grep still
+  absent from upstream. Self-contained, could be ported as its own small commit.
+- [ ] `e295be4`/`bde9080`/`3ab26f7` - multi-instance `Connect` rejection messages +
+  `ListTiaPortalInstances`: upstream's own `Connect`/`GetPortals` already exist with a different
+  multi-instance model (see `McpServer.cs` - `Connect(portalId)`, stateless per-request) - check
+  whether upstream's version already surfaces the process list adequately before assuming a gap.
+- [ ] `93e15e7`/`dbd7ed0`/`a832c64` - block/type/tag write CRUD, SCL external source import/export,
+  HMI screens/alarms/text lists, HMI tag table reads: the rebase plan's context notes upstream
+  already has fresh implementations of tag/constant/watch/force-table tools and external-source
+  import/export - these are very likely redundant, but not individually diffed against upstream's
+  versions yet. Needs a feature-by-feature comparison, not a blind port.
+- [ ] `d4baaa8`/`768d097`/`b021c6d` - cross-reference tools: upstream already has
+  `GetTypeCrossReferences`/`GetBlockCrossReferences` per the plan context - check its own error
+  handling for "no project open" before assuming the old fork's fix is still needed.
+- [ ] `dcf8e0f`/`34275ab` - `GetOnlineState`/`GoOnline`/`GoOffline`: check whether upstream has
+  equivalent online-mode tools before porting.
+
+Remaining commits in the range are docs-only (`CHANGES.md`/`TODO.md`/`README.md` entries,
+`.gitignore` tweaks) and don't need porting - the old fork's own files aren't carried over, only
+the code/behavior they documented.
