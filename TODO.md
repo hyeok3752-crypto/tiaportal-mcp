@@ -256,11 +256,18 @@ adds, not bug fixes, and upstream may already cover the same ground differently)
   `ListTiaPortalInstances`: upstream's own `Connect`/`GetPortals` already exist with a different
   multi-instance model (see `McpServer.cs` - `Connect(portalId)`, stateless per-request) - check
   whether upstream's version already surfaces the process list adequately before assuming a gap.
-- [ ] `93e15e7`/`dbd7ed0`/`a832c64` - block/type/tag write CRUD, SCL external source import/export,
-  HMI screens/alarms/text lists, HMI tag table reads: the rebase plan's context notes upstream
-  already has fresh implementations of tag/constant/watch/force-table tools and external-source
-  import/export - these are very likely redundant, but not individually diffed against upstream's
-  versions yet. Needs a feature-by-feature comparison, not a blind port.
+- [x] `93e15e7` - block/type/tag write CRUD: confirmed fully redundant. Upstream already has
+  DeleteBlock/DeleteBlockGroup/DeleteType/DeleteTypeGroup/DeleteTagTable/DeleteTagTableGroup/
+  DeleteTag/DeleteUserConstant/DeleteWatchTable/DeleteWatchTableGroup (`McpServer.Blocks.cs`/
+  `McpServer.Types.cs`/`McpServer.Tags.cs`). Not porting.
+- [x] `dbd7ed0` (SCL external source import/export half) - confirmed fully redundant. Upstream
+  already has GetExternalSources/CreateExternalSourceFromFile/ImportExternalSource/
+  DeleteExternalSource(Group)/CreateExternalSourceGroup (`McpServer.Sources.cs`). Not porting.
+- [ ] `dbd7ed0` (HMI screens/alarms/text lists half) + `a832c64` (HMI tag table reads): confirmed
+  via grep this is a genuine, real gap - upstream has no HMI-specific tooling at all outside
+  `McpPrompts.cs`. This is a substantially larger feature area than the other items in this list
+  (screens, alarms, text lists, tag tables, across both Unified Comfort and Advanced Panels) -
+  needs its own scoping decision before porting, not a quick reapply.
 - [ ] `d4baaa8`/`768d097`/`b021c6d` - cross-reference tools: upstream already has
   `GetTypeCrossReferences`/`GetBlockCrossReferences` per the plan context - check its own error
   handling for "no project open" before assuming the old fork's fix is still needed.
