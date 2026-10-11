@@ -228,14 +228,16 @@ namespace TiaMcpServer.Siemens
             return success;
         }
 
-        public IEnumerable<PlcType>? ExportXmlTypes(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
+        public (List<PlcType> Exported, List<string> Failures) ExportXmlTypes(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
         {
             _logger?.LogInformation("Exporting types...");
 
             if (IsProjectNull())
             {
-                return null;
+                throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal");
             }
+
+            Operation.RequireAbsolutePath(exportPath);
 
             var exportList = new List<PlcType>();
             var failures = new List<string>();
@@ -249,7 +251,7 @@ namespace TiaMcpServer.Siemens
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to retrieve type list for {SoftwarePath}", softwarePath);
-                return exportList;
+                return (exportList, failures);
             }
 
             for (int i = 0; i < list.Count(); i++)
@@ -330,7 +332,7 @@ namespace TiaMcpServer.Siemens
                 _logger?.LogInformation($"ExportXmlTypes completed successfully. Exported {exportList.Count} types.");
             }
 
-            return exportList;
+            return (exportList, failures);
         }
 
         #endregion

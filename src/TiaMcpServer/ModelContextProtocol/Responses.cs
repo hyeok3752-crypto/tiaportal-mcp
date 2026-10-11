@@ -417,6 +417,7 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         public IEnumerable<ResponseBlockInfo>? Items { get; set; }
         public IEnumerable<ResponseBlockInfo>? Inconsistent { get; set; }
+        public IEnumerable<string>? Failures { get; set; }
     }
 
     public class ResponseTypes : ResponseMessage
@@ -436,6 +437,7 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         public IEnumerable<ResponseTypeInfo>? Items { get; set; }
         public IEnumerable<ResponseTypeInfo>? Inconsistent { get; set; }
+        public IEnumerable<string>? Failures { get; set; }
     }
 
     public class ResponseExportAsDocuments : ResponseMessage
@@ -445,6 +447,7 @@ namespace TiaMcpServer.ModelContextProtocol
     public class ResponseExportBlocksAsDocuments : ResponseMessage
     {
         public IEnumerable<ResponseBlockInfo>? Items { get; set; }
+        public IEnumerable<string>? Failures { get; set; }
     }
 
     public class ResponseImportFromDocuments : ResponseMessage

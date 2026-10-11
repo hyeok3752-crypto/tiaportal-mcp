@@ -25,6 +25,8 @@ namespace TiaMcpServer.Siemens
                         throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal");
                     }
 
+                    Operation.RequireAbsolutePath(exportPath);
+
                     var caxProvider = _project!.GetService<CaxProvider>()
                         ?? throw new PortalException(PortalErrorCode.InvalidState, "CAx export is not available for this project/session");
 

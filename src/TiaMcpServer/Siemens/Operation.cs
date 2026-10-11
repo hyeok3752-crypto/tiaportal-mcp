@@ -123,5 +123,24 @@ namespace TiaMcpServer.Siemens
 
             return pex;
         }
+
+        /// <summary>
+        /// Every export/output-path parameter in this codebase must pass through this check
+        /// before being combined into a file path. A relative path resolves against the server
+        /// process's current working directory, which the caller does not control and which may
+        /// not be writable - Claude Desktop launches this server with its working directory set
+        /// to a system folder (no write access for a non-admin user). Live-tested: an unchecked
+        /// relative exportPath on a batch export silently exported 0 of N items, with every
+        /// per-item UnauthorizedAccessException swallowed into an internal failures list nobody
+        /// surfaced to the caller, reporting success=true. Reject upfront instead of failing open.
+        /// </summary>
+        internal static void RequireAbsolutePath(string path, string paramName = "exportPath")
+        {
+            if (!System.IO.Path.IsPathRooted(path))
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"{paramName} must be an absolute path - relative paths resolve against the server process's working directory, which may not be writable. Got: '{path}'");
+            }
+        }
     }
 }

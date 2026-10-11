@@ -115,13 +115,16 @@ namespace TiaMcpServer.ModelContextProtocol
 
                 return new ResponseExportTypesAsDocuments
                 {
-                    Message = $"Document export completed: {exported} PLC data types with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'",
+                    Message = outcome.Failures.Count == 0
+                        ? $"Document export completed: {exported} PLC data types with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'"
+                        : $"Document export completed with {outcome.Failures.Count} failure(s): {exported} of {total} PLC data types exported from '{softwarePath}' to '{exportPath}'. First failure: {outcome.Failures[0]}",
                     Items = outcome.Exported.Where(e => e.Type is not null).Select(e => ToTypeInfo(e.Type!)).ToList(),
                     Documents = outcome.Exported.Select(e => ToDocumentFiles(e.Documents)).ToList(),
                     Inconsistent = outcome.Inconsistent.Select(ToTypeInfo).ToList(),
                     Failures = outcome.Failures,
                     Meta = Ok(new JsonObject
                     {
+                        ["success"] = outcome.Failures.Count == 0,
                         ["totalTypes"] = total,
                         ["exportedTypes"] = exported,
                         ["inconsistentTypes"] = outcome.Inconsistent.Count,
@@ -372,69 +375,62 @@ namespace TiaMcpServer.ModelContextProtocol
                 progress.Report(new ProgressNotificationValue { Progress = 0, Total = totalBlocks, Message = $"Starting export of {totalBlocks} blocks as documents..." });
 
                 // Export blocks as documents asynchronously
-                var exportedBlocks = await Task.Run(() => Portal.ExportBlocksAsDocuments(softwarePath, exportPath, regexName, preservePath));
-                
+                var (exportedBlocks, failures) = await Task.Run(() => Portal.ExportBlocksAsDocuments(softwarePath, exportPath, regexName, preservePath));
+
                 // Send progress update after export completion
-                if (exportedBlocks != null)
-                {
-                    var exportedCount = exportedBlocks.Count();
-                    progress.Report(new ProgressNotificationValue { Progress = exportedCount, Total = totalBlocks, Message = $"Exported {exportedCount} of {totalBlocks} blocks as documents" });
-                }
+                var exportedCount = exportedBlocks.Count;
+                progress.Report(new ProgressNotificationValue { Progress = exportedCount, Total = totalBlocks, Message = $"Exported {exportedCount} of {totalBlocks} blocks as documents" });
 
-                if (exportedBlocks != null)
+                var responseList = new List<ResponseBlockInfo>();
+
+                foreach (var block in exportedBlocks)
                 {
-                    var responseList = new List<ResponseBlockInfo>();
-                    var processedCount = 0;
-                    
-                    foreach (var block in exportedBlocks)
+                    if (block != null)
                     {
-                        if (block != null)
-                        {
-                            var attributes = Helper.GetAttributeList(block);
+                        var attributes = Helper.GetAttributeList(block);
 
-                            responseList.Add(new ResponseBlockInfo
-                            {
-                                Path = Portal.GetBlockPath(block),
-                                Name = block.Name,
-                                TypeName = block.GetType().Name,
-                                Namespace = block.Namespace,
-                                ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
-                                MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
-                                IsConsistent = block.IsConsistent,
-                                HeaderName = block.HeaderName,
-                                ModifiedDate = block.ModifiedDate,
-                                IsKnowHowProtected = block.IsKnowHowProtected,
-                                Attributes = attributes,
-                                Description = block.ToString()
-                            });
-                        }
-                        processedCount++;
+                        responseList.Add(new ResponseBlockInfo
+                        {
+                            Path = Portal.GetBlockPath(block),
+                            Name = block.Name,
+                            TypeName = block.GetType().Name,
+                            Namespace = block.Namespace,
+                            ProgrammingLanguage = Enum.GetName(typeof(ProgrammingLanguage), block.ProgrammingLanguage),
+                            MemoryLayout = Enum.GetName(typeof(MemoryLayout), block.MemoryLayout),
+                            IsConsistent = block.IsConsistent,
+                            HeaderName = block.HeaderName,
+                            ModifiedDate = block.ModifiedDate,
+                            IsKnowHowProtected = block.IsKnowHowProtected,
+                            Attributes = attributes,
+                            Description = block.ToString()
+                        });
                     }
-
-                    // Send final progress notification
-                    progress.Report(new ProgressNotificationValue { Progress = processedCount, Total = totalBlocks, Message = $"Document export completed: {processedCount} blocks exported successfully" });
-
-                    var duration = (DateTime.Now - startTime).TotalSeconds;
-                    Logger?.LogInformation($"Document export completed: {processedCount} blocks exported in {duration:F2} seconds");
-
-                    return new ResponseExportBlocksAsDocuments
-                    {
-                        Message = $"Document export completed: {processedCount} blocks with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'",
-                        Items = responseList,
-                        Meta = new JsonObject
-                        {
-                            ["timestamp"] = DateTime.Now,
-                            ["success"] = true,
-                            ["totalBlocks"] = totalBlocks,
-                            ["exportedBlocks"] = processedCount,
-                            ["duration"] = duration
-                        }
-                    };
                 }
-                else
+
+                // Send final progress notification
+                progress.Report(new ProgressNotificationValue { Progress = exportedCount, Total = totalBlocks, Message = $"Document export completed: {exportedCount} blocks exported successfully" });
+
+                var duration = (DateTime.Now - startTime).TotalSeconds;
+                Logger?.LogInformation($"Document export completed: {exportedCount} blocks exported in {duration:F2} seconds");
+
+                var success = failures.Count == 0;
+                return new ResponseExportBlocksAsDocuments
                 {
-                    throw new McpException($"Failed exporting documents to '{exportPath}'");
-                }
+                    Message = success
+                        ? $"Document export completed: {exportedCount} blocks with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'"
+                        : $"Document export completed with {failures.Count} failure(s): {exportedCount} of {totalBlocks} blocks exported from '{softwarePath}' to '{exportPath}'. First failure: {failures[0]}",
+                    Items = responseList,
+                    Failures = success ? null : failures,
+                    Meta = new JsonObject
+                    {
+                        ["timestamp"] = DateTime.Now,
+                        ["success"] = success,
+                        ["totalBlocks"] = totalBlocks,
+                        ["exportedBlocks"] = exportedCount,
+                        ["failureCount"] = failures.Count,
+                        ["duration"] = duration
+                    }
+                };
             }
             catch (Exception ex) when (ex is not McpException)
             {

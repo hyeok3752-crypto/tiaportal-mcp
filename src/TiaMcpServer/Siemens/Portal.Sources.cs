@@ -342,6 +342,7 @@ namespace TiaMcpServer.Siemens
                 {
                     // Fail before writing anything when the path is wrong.
                     GetPlcSoftwareOrThrow(softwarePath);
+                    Operation.RequireAbsolutePath(exportPath);
 
                     var result = new SourceTreeResult { Directory = exportPath };
 
@@ -349,15 +350,17 @@ namespace TiaMcpServer.Siemens
                     // snapshot missing every block would be worse than a less readable one.
                     if (Engineering.TiaMajorVersion >= 20)
                     {
-                        var blocks = ExportBlocksAsDocuments(softwarePath, exportPath, string.Empty, preservePath: true);
+                        var (blocks, blockFailures) = ExportBlocksAsDocuments(softwarePath, exportPath, string.Empty, preservePath: true);
 
-                        Record(result, "blocks", "document", blocks?.Count() ?? 0);
+                        Record(result, "blocks", "document", blocks.Count);
+                        result.Failures.AddRange(blockFailures.Select(f => $"block {f}"));
                     }
                     else
                     {
-                        var blocks = ExportXmlBlocks(softwarePath, exportPath, string.Empty, preservePath: true);
+                        var (blocks, blockFailures) = ExportXmlBlocks(softwarePath, exportPath, string.Empty, preservePath: true);
 
-                        Record(result, "blocks", "xml", blocks?.Count() ?? 0);
+                        Record(result, "blocks", "xml", blocks.Count);
+                        result.Failures.AddRange(blockFailures.Select(f => $"block {f}"));
                     }
 
                     if (Engineering.TiaMajorVersion >= MinVersionForTypeDocuments)
@@ -370,9 +373,10 @@ namespace TiaMcpServer.Siemens
                     }
                     else
                     {
-                        var types = ExportXmlTypes(softwarePath, exportPath, string.Empty, preservePath: true);
+                        var (types, typeFailures) = ExportXmlTypes(softwarePath, exportPath, string.Empty, preservePath: true);
 
-                        Record(result, "types", "xml", types?.Count() ?? 0);
+                        Record(result, "types", "xml", types.Count);
+                        result.Failures.AddRange(typeFailures.Select(f => $"type {f}"));
                     }
 
                     // Tag and watch tables have no document format in V21; XML is all there is.
@@ -506,6 +510,8 @@ namespace TiaMcpServer.Siemens
             return Operation.Run(_logger, nameof(ExportSourceBlock), PortalErrorCode.ExportFailed,
                 () =>
                 {
+                    Operation.RequireAbsolutePath(exportPath);
+
                     var group = GetSourceSystemGroup(softwarePath);
 
                     var block = GetBlock(softwarePath, blockPath)
@@ -546,6 +552,8 @@ namespace TiaMcpServer.Siemens
             return Operation.Run(_logger, nameof(ExportSourceType), PortalErrorCode.ExportFailed,
                 () =>
                 {
+                    Operation.RequireAbsolutePath(exportPath);
+
                     var group = GetSourceSystemGroup(softwarePath);
 
                     var type = GetType(softwarePath, typePath)
@@ -591,6 +599,7 @@ namespace TiaMcpServer.Siemens
                 () =>
                 {
                     // Fail before writing anything when the path is wrong.
+                    Operation.RequireAbsolutePath(exportPath);
                     var group = GetSourceSystemGroup(softwarePath);
 
                     var result = new GeneratedSourcesResult { Directory = exportPath };
@@ -622,6 +631,7 @@ namespace TiaMcpServer.Siemens
             return Operation.Run(_logger, nameof(ExportSourceBlocks), PortalErrorCode.ExportFailed,
                 () =>
                 {
+                    Operation.RequireAbsolutePath(exportPath);
                     var sourceGroup = GetSourceSystemGroup(softwarePath);
 
                     var group = NormalizeGroupPath(groupPath).Length == 0
@@ -660,6 +670,7 @@ namespace TiaMcpServer.Siemens
             return Operation.Run(_logger, nameof(ExportSourceTypes), PortalErrorCode.ExportFailed,
                 () =>
                 {
+                    Operation.RequireAbsolutePath(exportPath);
                     var sourceGroup = GetSourceSystemGroup(softwarePath);
 
                     var group = NormalizeGroupPath(groupPath).Length == 0

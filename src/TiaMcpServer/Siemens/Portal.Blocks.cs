@@ -257,18 +257,20 @@ namespace TiaMcpServer.Siemens
             return false;
         }
 
-        public IEnumerable<PlcBlock>? ExportXmlBlocks(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
+        public (List<PlcBlock> Exported, List<string> Failures) ExportXmlBlocks(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
         {
             _logger?.LogInformation("Exporting blocks...");
 
             if (IsProjectNull())
             {
-                return null;
+                throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal");
             }
+
+            Operation.RequireAbsolutePath(exportPath);
 
             var exportList = new List<PlcBlock>();
             var failures = new List<string>();
-            
+
             PlcBlock[] list;
 
             try
@@ -278,7 +280,7 @@ namespace TiaMcpServer.Siemens
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to retrieve block list for {SoftwarePath}", softwarePath);
-                return exportList;
+                return (exportList, failures);
             }
 
             for (int k = 0; k < list.Count(); k++)
@@ -369,14 +371,13 @@ namespace TiaMcpServer.Siemens
             if (failures.Count > 0)
             {
                 _logger?.LogWarning($"ExportXmlBlocks completed with {failures.Count} failures out of {list.Count()}. First failure: {failures[0]}");
-                // Optionally: _logger?.LogDebug("All failures: {Failures}", string.Join("; ", failures));
             }
             else
             {
                 _logger?.LogInformation($"ExportXmlBlocks completed successfully. Exported {exportList.Count} blocks.");
             }
 
-            return exportList;
+            return (exportList, failures);
         }
 
         #endregion

@@ -238,7 +238,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 progress.Report(new ProgressNotificationValue { Progress = 0, Total = totalTypes, Message = $"Starting export of {totalTypes} types..." });
 
                 // Export types asynchronously
-                var exportedTypes = await Task.Run(() => Portal.ExportXmlTypes(softwarePath, exportPath, regexName, preservePath));
+                var (exportedTypes, failures) = await Task.Run(() => Portal.ExportXmlTypes(softwarePath, exportPath, regexName, preservePath));
 
                 // Build list of inconsistent (skipped) types for reporting
                 var inconsistentTypeInfos = new List<ResponseTypeInfo>();
@@ -264,67 +264,60 @@ namespace TiaMcpServer.ModelContextProtocol
                         }
                     }
                 }
-                
+
                 // Send progress update after export completion
-                if (exportedTypes != null)
-                {
-                    var exportedCount = exportedTypes.Count();
-                    progress.Report(new ProgressNotificationValue { Progress = exportedCount, Total = totalTypes, Message = $"Exported {exportedCount} of {totalTypes} types" });
-                }
+                var exportedCount = exportedTypes.Count;
+                progress.Report(new ProgressNotificationValue { Progress = exportedCount, Total = totalTypes, Message = $"Exported {exportedCount} of {totalTypes} types" });
 
-                if (exportedTypes != null)
+                var responseList = new List<ResponseTypeInfo>();
+
+                foreach (var type in exportedTypes)
                 {
-                    var responseList = new List<ResponseTypeInfo>();
-                    var processedCount = 0;
-                    
-                    foreach (var type in exportedTypes)
+                    if (type != null)
                     {
-                        if (type != null)
-                        {
-                            var attributes = Helper.GetAttributeList(type);
+                        var attributes = Helper.GetAttributeList(type);
 
-                            responseList.Add(new ResponseTypeInfo
-                            {
-                                Path = Portal.GetTypePath(type),
-                                Name = type.Name,
-                                TypeName = type.GetType().Name,
-                                Namespace = type.Namespace,
-                                IsConsistent = type.IsConsistent,
-                                ModifiedDate = type.ModifiedDate,
-                                IsKnowHowProtected = type.IsKnowHowProtected,
-                                Attributes = attributes,
-                                Description = type.ToString()
-                            });
-                        }
-                        processedCount++;
+                        responseList.Add(new ResponseTypeInfo
+                        {
+                            Path = Portal.GetTypePath(type),
+                            Name = type.Name,
+                            TypeName = type.GetType().Name,
+                            Namespace = type.Namespace,
+                            IsConsistent = type.IsConsistent,
+                            ModifiedDate = type.ModifiedDate,
+                            IsKnowHowProtected = type.IsKnowHowProtected,
+                            Attributes = attributes,
+                            Description = type.ToString()
+                        });
                     }
-
-                    // Send final progress notification
-                    progress.Report(new ProgressNotificationValue { Progress = processedCount, Total = totalTypes, Message = $"Export completed: {processedCount} types exported successfully" });
-
-                    var duration = (DateTime.Now - startTime).TotalSeconds;
-                    Logger?.LogInformation($"Type export completed: {processedCount} types exported in {duration:F2} seconds");
-
-                    return new ResponseExportXmlTypes
-                    {
-                        Message = $"Export completed: {processedCount} types with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'",
-                        Items = responseList,
-                        Inconsistent = inconsistentTypeInfos,
-                        Meta = new JsonObject
-                        {
-                            ["timestamp"] = DateTime.Now,
-                            ["success"] = true,
-                            ["totalTypes"] = totalTypes,
-                            ["exportedTypes"] = processedCount,
-                            ["inconsistentTypes"] = inconsistentTypeInfos.Count,
-                            ["duration"] = duration
-                        }
-                    };
                 }
-                else
+
+                // Send final progress notification
+                progress.Report(new ProgressNotificationValue { Progress = exportedCount, Total = totalTypes, Message = $"Export completed: {exportedCount} types exported successfully" });
+
+                var duration = (DateTime.Now - startTime).TotalSeconds;
+                Logger?.LogInformation($"Type export completed: {exportedCount} types exported in {duration:F2} seconds");
+
+                var success = failures.Count == 0;
+                return new ResponseExportXmlTypes
                 {
-                    throw new McpException($"Failed exporting types '{regexName}' from '{softwarePath}' to {exportPath}");
-                }
+                    Message = success
+                        ? $"Export completed: {exportedCount} types with regex '{regexName}' exported from '{softwarePath}' to '{exportPath}'"
+                        : $"Export completed with {failures.Count} failure(s): {exportedCount} of {totalTypes} types exported from '{softwarePath}' to '{exportPath}'. First failure: {failures[0]}",
+                    Items = responseList,
+                    Inconsistent = inconsistentTypeInfos,
+                    Failures = success ? null : failures,
+                    Meta = new JsonObject
+                    {
+                        ["timestamp"] = DateTime.Now,
+                        ["success"] = success,
+                        ["totalTypes"] = totalTypes,
+                        ["exportedTypes"] = exportedCount,
+                        ["inconsistentTypes"] = inconsistentTypeInfos.Count,
+                        ["failureCount"] = failures.Count,
+                        ["duration"] = duration
+                    }
+                };
             }
             catch (Exception ex) when (ex is not McpException)
             {

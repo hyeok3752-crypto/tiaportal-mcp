@@ -152,6 +152,8 @@ namespace TiaMcpServer.Siemens
             return Operation.Run(_logger, nameof(ExportXmlTagTable), PortalErrorCode.ExportFailed,
                 () =>
                 {
+                    Operation.RequireAbsolutePath(exportPath);
+
                     var table = GetTagTable(softwarePath, tagTablePath)
                         ?? throw new PortalException(PortalErrorCode.NotFound,
                             $"Tag table not found at '{tagTablePath}'. Use 'GetTagTables' to list the available tables.");
@@ -412,6 +414,8 @@ namespace TiaMcpServer.Siemens
             return Operation.Run(_logger, nameof(ExportXmlWatchTable), PortalErrorCode.ExportFailed,
                 () =>
                 {
+                    Operation.RequireAbsolutePath(exportPath);
+
                     var table = GetWatchTable(softwarePath, watchTablePath)
                         ?? throw new PortalException(PortalErrorCode.NotFound,
                             $"Watch table not found at '{watchTablePath}'. Use 'GetWatchTables' to list the available tables.");
