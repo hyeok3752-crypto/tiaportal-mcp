@@ -247,11 +247,11 @@ devices/sub-items on the live test project.
 
 Not yet checked - lower priority / needs a scoping decision before porting (these are feature
 adds, not bug fixes, and upstream may already cover the same ground differently):
-- [ ] `6e32d8b` - "strip synthetic tree-root labels from block/type paths": old fork's own
-  `GetSoftwareTree`-shaped path bug. Upstream has its own block/type path resolution
-  (`Portal.Blocks.cs`/`Portal.Types.cs`) with a different implementation - check whether an
-  analogous "tree label doesn't match real group name" bug exists there before porting this fix
-  verbatim; it may not apply at all.
+- [x] `6e32d8b` - "strip synthetic tree-root labels from block/type paths": confirmed not needed.
+  Upstream's `GetPlcBlockGroupByPath`/type equivalent already deliberately excludes the "Program
+  blocks"/"PLC data types" system group from round-tripped paths, with an explicit
+  `includeSystemGroup` parameter documented to round-trip correctly either way
+  (`Portal.Blocks.cs` ~line 75, ~line 401). Old fork's fix doesn't apply to this implementation.
 - [ ] `e295be4`/`bde9080`/`3ab26f7` - multi-instance `Connect` rejection messages +
   `ListTiaPortalInstances`: upstream's own `Connect`/`GetPortals` already exist with a different
   multi-instance model (see `McpServer.cs` - `Connect(portalId)`, stateless per-request) - check
