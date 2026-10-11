@@ -44,10 +44,22 @@ namespace TiaMcpServer.Siemens
                     GetDevicesRecursive(group, list, regexName);
                 }
 
-                //foreach (var group in _project.UngroupedDevicesGroup)
-                //{
-                //    GetDevicesRecursive(_project.UngroupedDevicesGroup, list, regexName);
-                //}
+                // "Ungrouped devices" in the project tree - a DeviceSystemGroup, not a
+                // DeviceUserGroup, so it can't go through GetDevicesRecursive (different type,
+                // no subgroups of its own). Live-tested on a real project: GSD-based devices,
+                // SCALANCE switches and ET200SP/eco stations can live only here - this was
+                // silently dropping them from every GetDevices() caller (previously commented
+                // out, presumably because UngroupedDevicesGroup isn't itself IEnumerable).
+                if (_project.UngroupedDevicesGroup?.Devices != null)
+                {
+                    foreach (Device device in _project.UngroupedDevicesGroup.Devices)
+                    {
+                        if (string.IsNullOrEmpty(regexName) || Regex.IsMatch(device.Name, regexName, RegexOptions.IgnoreCase))
+                        {
+                            list.Add(device);
+                        }
+                    }
+                }
             }
 
             return list;
@@ -185,6 +197,19 @@ namespace TiaMcpServer.Siemens
             if (_project?.Devices == null || string.IsNullOrWhiteSpace(devicePath))
                 return null;
 
+            // A hardware PLC's Device.Name can itself contain '/' (e.g. 'S7-1500/ET200MP
+            // station_1'), which isn't visible as such in the TIA Portal IDE. Always try an
+            // exact whole-string match against real device names first, before treating '/' as
+            // a path separator - otherwise a name like that gets mis-split into bogus
+            // group/device segments and the device is reported as not found. Live-tested against
+            // a real project with a device literally named this way - confirmed this bug is
+            // inherited from upstream unchanged, not something the rebase introduced.
+            var exactMatch = FindDeviceByFullName(devicePath);
+            if (exactMatch != null)
+            {
+                return exactMatch;
+            }
+
             var pathSegments = devicePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
             if (pathSegments.Length == 0)
             {
@@ -220,6 +245,59 @@ namespace TiaMcpServer.Siemens
                 if (group is null)
                 {
                     break;
+                }
+            }
+
+            return null;
+        }
+
+        // Searches top-level devices, every device group (recursively), and the project's
+        // "Ungrouped devices" system group for a device whose Name matches the given string
+        // exactly - used by GetDeviceByPath (device names can contain '/') and by
+        // Portal.Network.cs's network-interface path resolution (same reasoning). The
+        // "Ungrouped devices" fallback is load-bearing, not optional - live-tested on a real
+        // project where GSD/SCALANCE/ET200 devices live only under that group.
+        private Device? FindDeviceByFullName(string name)
+        {
+            if (_project?.Devices == null)
+            {
+                return null;
+            }
+
+            var device = _project.Devices.FirstOrDefault(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (device != null)
+            {
+                return device;
+            }
+
+            device = FindDeviceByFullNameInGroups(_project.DeviceGroups, name);
+            if (device != null)
+            {
+                return device;
+            }
+
+            return _project.UngroupedDevicesGroup?.Devices?.FirstOrDefault(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static Device? FindDeviceByFullNameInGroups(DeviceUserGroupComposition? groups, string name)
+        {
+            if (groups == null)
+            {
+                return null;
+            }
+
+            foreach (var group in groups)
+            {
+                var device = group.Devices?.FirstOrDefault(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (device != null)
+                {
+                    return device;
+                }
+
+                var found = FindDeviceByFullNameInGroups(group.Groups, name);
+                if (found != null)
+                {
+                    return found;
                 }
             }
 

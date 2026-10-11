@@ -221,52 +221,9 @@ namespace TiaMcpServer.Siemens
             return null;
         }
 
-        // Searches top-level devices and every device group (recursively) for a device whose
-        // Name matches the given string exactly - used to find devices whose own name contains
-        // '/' (e.g. "S7-1500/ET200MP station_1") before that character gets treated as a path
-        // separator by GetDevice. Scoped to this file's network-interface resolution only - not
-        // wired into GetDevice/GetDeviceByPath itself, since that's a wider-reaching behavior
-        // change left for a separate audit pass (see TODO.md).
-        private Device? FindDeviceByFullName(string name)
-        {
-            if (_project?.Devices == null)
-            {
-                return null;
-            }
-
-            var device = _project.Devices.FirstOrDefault(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-            if (device != null)
-            {
-                return device;
-            }
-
-            return FindDeviceByFullNameInGroups(_project.DeviceGroups, name);
-        }
-
-        private static Device? FindDeviceByFullNameInGroups(DeviceUserGroupComposition? groups, string name)
-        {
-            if (groups == null)
-            {
-                return null;
-            }
-
-            foreach (var group in groups)
-            {
-                var device = group.Devices?.FirstOrDefault(d => d.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-                if (device != null)
-                {
-                    return device;
-                }
-
-                var found = FindDeviceByFullNameInGroups(group.Groups, name);
-                if (found != null)
-                {
-                    return found;
-                }
-            }
-
-            return null;
-        }
+        // FindDeviceByFullName (device names can contain '/', and some devices live only under
+        // "Ungrouped devices") lives in Portal.Devices.cs - shared with GetDeviceByPath, same
+        // partial class.
 
         #endregion
 
