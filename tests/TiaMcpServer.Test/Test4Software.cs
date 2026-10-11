@@ -335,12 +335,12 @@ namespace TiaMcpServer.Test
 
             bool success = Common.OpenProject(_portal, projectPath);
 
-            var result = _portal.ExportXmlBlocks(softwarePath, exportPath, regexName, preservePath);
+            var (exported, failures) = _portal.ExportXmlBlocks(softwarePath, exportPath, regexName, preservePath);
 
-            if (result != null)
+            if (exported.Count > 0)
             {
                 Console.WriteLine($"Exported Block:");
-                foreach (var block in result)
+                foreach (var block in exported)
                 {
                     Console.WriteLine($"- {block.GetType().Name}, {block.Name}");
                 }
@@ -352,6 +352,11 @@ namespace TiaMcpServer.Test
                 Console.WriteLine("No blocks exported.");
 
                 success &= false;
+            }
+
+            if (failures.Count > 0)
+            {
+                Console.WriteLine($"Failures: {string.Join("; ", failures)}");
             }
 
             success &= Common.CloseProject(_portal, projectPath);
@@ -373,11 +378,11 @@ namespace TiaMcpServer.Test
 
             bool success = Common.OpenProject(_portal, projectPath);
 
-            var result = _portal.ExportXmlTypes(softwarePath, exportPath, regexName, preservePath);
-            if (result != null)
+            var (exported, failures) = _portal.ExportXmlTypes(softwarePath, exportPath, regexName, preservePath);
+            if (exported.Count > 0)
             {
                 Console.WriteLine($"Exported Types:");
-                foreach (var type in result)
+                foreach (var type in exported)
                 {
                     Console.WriteLine($"- {type.GetType().Name}, {type.Name}");
                 }
@@ -389,6 +394,11 @@ namespace TiaMcpServer.Test
                 Console.WriteLine("No types exported.");
 
                 success &= false;
+            }
+
+            if (failures.Count > 0)
+            {
+                Console.WriteLine($"Failures: {string.Join("; ", failures)}");
             }
 
             success &= Common.CloseProject(_portal, projectPath);
@@ -539,13 +549,13 @@ namespace TiaMcpServer.Test
 
             bool success = Common.OpenProject(_portal, projectPath);
 
-            var result = _portal.ExportBlocksAsDocuments(softwarePath, exportPath, regexName, preservePath);
+            var (exported, failures) = _portal.ExportBlocksAsDocuments(softwarePath, exportPath, regexName, preservePath);
 
-            if (result != null)
+            if (exported.Count > 0)
             {
                 Console.WriteLine($"Exported Block as documents:");
 
-                foreach (var block in result)
+                foreach (var block in exported)
                 {
                     Console.WriteLine($"- {block.GetType().Name}, {block.Name}, {block.ModifiedDate}");
                 }
@@ -557,6 +567,11 @@ namespace TiaMcpServer.Test
                 Console.WriteLine("No blocks exported as documents.");
 
                 success &= false;
+            }
+
+            if (failures.Count > 0)
+            {
+                Console.WriteLine($"Failures: {string.Join("; ", failures)}");
             }
 
             success &= Common.CloseProject(_portal, projectPath);
