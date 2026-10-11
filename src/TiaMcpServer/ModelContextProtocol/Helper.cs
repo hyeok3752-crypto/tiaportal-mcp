@@ -56,8 +56,11 @@ namespace TiaMcpServer.ModelContextProtocol
                 case DateTime:
                 case DateTimeOffset:
                 case Guid:
-                case Enum:
                     return value;
+                case Enum e:
+                    return e.ToString();
+                case MultilingualText mlt:
+                    return FirstText(mlt);
                 default:
                     return value.ToString();
             }
