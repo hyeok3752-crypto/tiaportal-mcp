@@ -19,13 +19,48 @@ namespace TiaMcpServer.ModelContextProtocol
                     attributes.Add(new Attribute
                     {
                         Name = attr.Name,
-                        Value = value,
+                        Value = SanitizeAttributeValue(value),
                         AccessMode = Enum.GetName(typeof(EngineeringAttributeAccessMode), attr.AccessMode)
                     });
                 }
             }
 
             return attributes;
+        }
+
+        // Some attribute values coming back from Openness aren't JSON-serializable as-is (e.g. a
+        // COM-wrapped object reference rather than a plain value) - that throws deep inside the
+        // MCP SDK's own response serialization, AFTER the tool method has already returned
+        // normally, so it can't be caught by a try/catch around the tool body. Live-tested: this
+        // broke GetSubnets on a real project (an attribute value no device's attributes happened
+        // to hit). Only widen this allow-list for types verified to serialize safely - everything
+        // else degrades to its string form rather than risking the same failure elsewhere.
+        private static object? SanitizeAttributeValue(object? value)
+        {
+            switch (value)
+            {
+                case null:
+                case string:
+                case bool:
+                case byte:
+                case sbyte:
+                case short:
+                case ushort:
+                case int:
+                case uint:
+                case long:
+                case ulong:
+                case float:
+                case double:
+                case decimal:
+                case DateTime:
+                case DateTimeOffset:
+                case Guid:
+                case Enum:
+                    return value;
+                default:
+                    return value.ToString();
+            }
         }
 
         /// <summary>
