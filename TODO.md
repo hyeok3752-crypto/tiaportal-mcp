@@ -263,11 +263,10 @@ adds, not bug fixes, and upstream may already cover the same ground differently)
 - [x] `dbd7ed0` (SCL external source import/export half) - confirmed fully redundant. Upstream
   already has GetExternalSources/CreateExternalSourceFromFile/ImportExternalSource/
   DeleteExternalSource(Group)/CreateExternalSourceGroup (`McpServer.Sources.cs`). Not porting.
-- [ ] `dbd7ed0` (HMI screens/alarms/text lists half) + `a832c64` (HMI tag table reads): confirmed
-  via grep this is a genuine, real gap - upstream has no HMI-specific tooling at all outside
-  `McpPrompts.cs`. This is a substantially larger feature area than the other items in this list
-  (screens, alarms, text lists, tag tables, across both Unified Comfort and Advanced Panels) -
-  needs its own scoping decision before porting, not a quick reapply.
+- [x] `dbd7ed0` (HMI screens/alarms/text lists half) + `a832c64` (HMI tag table reads): ported
+  (`Portal.Hmi.cs`/`McpServer.Hmi.cs`/`Responses.Hmi.cs`) and live-tested against the real
+  "claude for tia" project's HMI_1/HMI_RT_1 panel - real screens, tag tables, alarms (~1.9MB of
+  discrete alarms), text list names, and HMI tags correctly linked to their PLC_1 source tags.
 - [ ] `d4baaa8`/`768d097`/`b021c6d` - cross-reference tools: upstream already has
   `GetTypeCrossReferences`/`GetBlockCrossReferences` per the plan context - check its own error
   handling for "no project open" before assuming the old fork's fix is still needed.
