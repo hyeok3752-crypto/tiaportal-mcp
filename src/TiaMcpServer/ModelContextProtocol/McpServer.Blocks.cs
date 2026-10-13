@@ -68,7 +68,8 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("regexName: defines the name or regular expression to find the block, matched anywhere in the block name ('G3U' also matches G3U10..G3U12; anchor with ^...$ for an exact name). Use empty string (default) to find all")] string regexName = "",
             [Description("includeAttributes: return every Openness attribute of each block (about 30 each). Default true. Pass false on a large PLC when only names and paths are needed - reading the attributes is most of this tool's run time")] bool includeAttributes = true,
             [Description("offset: number of matching blocks to skip, for paging through a large PLC. Default 0")] int offset = 0,
-            [Description("limit: maximum number of blocks to return; 0 (default) returns all. 'totalCount' in the reply is the number of matches before paging")] int limit = 0)
+            [Description("limit: maximum number of blocks to return; 0 (default) returns all. 'totalCount' in the reply is the number of matches before paging")] int limit = 0,
+            [Description("modifiedSince: optional date/time; only blocks changed in TIA Portal after it are returned (REQUESTS.md P6). ISO 8601, e.g. '2026-10-13T09:00:00' (no offset = local time of the server PC) or '2026-10-13T00:00:00Z'. 'modifiedDate' in the reply is UTC")] string modifiedSince = "")
         {
             try
             {
@@ -79,7 +80,22 @@ namespace TiaMcpServer.ModelContextProtocol
 
                 var list = Portal.GetBlocks(softwarePath, regexName);
 
-                var matches = list?.Where(b => b != null).ToList() ?? new List<PlcBlock>();
+                DateTime? since = null;
+
+                if (!string.IsNullOrWhiteSpace(modifiedSince))
+                {
+                    if (!DateTime.TryParse(modifiedSince, System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.AssumeLocal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsed))
+                    {
+                        throw new McpException($"modifiedSince '{modifiedSince}' is not a date/time; use ISO 8601 such as '2026-10-13T09:00:00'.");
+                    }
+
+                    since = parsed;
+                }
+
+                var matches = list?.Where(b => b != null)
+                    .Where(b => since == null || AsUtc(b.ModifiedDate) > since.Value)
+                    .ToList() ?? new List<PlcBlock>();
                 var page = matches.Skip(offset).Take(limit > 0 ? limit : int.MaxValue).ToList();
                 var paged = offset > 0 || (limit > 0 && matches.Count > limit);
 
@@ -113,6 +129,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     return new ResponseBlocks
                     {
                         Message = $"Blocks with regex '{regexName}' retrieved from '{softwarePath}'" +
+                                  (since != null ? $", modified after {since.Value:yyyy-MM-dd HH:mm:ss} UTC" : string.Empty) +
                                   (paged ? $" - returned {responseList.Count} of {matches.Count} starting at {offset}" : string.Empty),
                         Items = responseList,
                         TotalCount = matches.Count,
@@ -133,6 +150,10 @@ namespace TiaMcpServer.ModelContextProtocol
                 throw new McpException($"Unexpected error retrieving blocks with regex '{regexName}' in '{softwarePath}': {ex.Message}", ex);
             }
         }
+
+        // Openness reports ModifiedDate in UTC; an Unspecified kind is taken as UTC too.
+        private static DateTime AsUtc(DateTime value) =>
+            value.Kind == DateTimeKind.Local ? value.ToUniversalTime() : DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
         [McpServerTool(Name = "GetBlocksWithHierarchy", Title = "Get blocks with hierarchy", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Get a list of all blocks with their group hierarchy from the PLC software.")]
         public static ResponseBlocksWithHierarchy GetBlocksWithHierarchy(

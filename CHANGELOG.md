@@ -10,6 +10,9 @@
   blanks. Reads files only - no TIA Portal connection or lock needed.
 - __GetBlocks paging__ (P5): optional `offset` and `limit`; the reply gets `totalCount` (added field), the
   number of matches before paging. Attributes are read for the returned page only.
+- __GetBlocks modifiedSince__ (P6): optional ISO date/time; only blocks changed after it are returned,
+  e.g. to find what was edited directly in TIA Portal since the last export. Without an offset the value
+  is local time of the server PC; `modifiedDate` in the reply is UTC (Openness), `meta.timestamp` local.
 - __Prompts for the HMI tools__: the ten WinCC Unified tools had no prompt of the same name, which
   `Test_708_EveryTool_HasAPromptOfTheSameName` requires.
 
