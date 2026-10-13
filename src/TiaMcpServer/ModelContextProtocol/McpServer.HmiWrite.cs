@@ -169,7 +169,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description(HmiPathDescription)] string softwarePath,
             [Description("screenName: name of the screen")] string screenName,
             [Description("name: name of the new faceplate container, unique on the screen")] string name,
-            [Description("faceplateType: the faceplate type with version, exactly as 'GetHmiScreenItems' shows it, e.g. 'FP_Motor V 0.0.1'")] string faceplateType,
+            [Description("faceplateType: the faceplate type with version, exactly as 'GetHmiScreenItems' shows it, e.g. 'V0.0.7\\Servo_Faceplate_2'")] string faceplateType,
             [Description("left: optional x position in pixels")] int? left = null,
             [Description("top: optional y position in pixels")] int? top = null,
             [Description("width: optional width in pixels")] uint? width = null,
@@ -184,7 +184,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         [WriteTool]
         [McpServerTool(Name = "SetHmiFaceplateInterface", Title = "Set HMI faceplate interface", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Set one interface property of a faceplate on a WinCC Unified screen, either to a static 'value' or bound to an HMI 'tag' (pass exactly one). Returns the faceplate as read back, with all its interface properties")]
+         Description("Set one interface property of a faceplate on a WinCC Unified screen, either to a static 'value' or to an HMI 'tag' (pass exactly one). A tag-typed property (e.g. a UDT tag) stores the tag name as its value, as TIA Portal itself does; texts are given as plain text. Returns the faceplate as read back, with all its interface properties")]
         public static ResponseHmiScreenItemWrite SetHmiFaceplateInterface(
             [Description(HmiPathDescription)] string softwarePath,
             [Description("screenName: name of the screen")] string screenName,

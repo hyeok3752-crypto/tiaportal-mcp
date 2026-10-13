@@ -318,7 +318,7 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>
         /// Places a faceplate on a screen. 'faceplateType' is the faceplate type as TIA Portal names
-        /// it in the container's "Contained type", e.g. 'FP_Motor V 0.0.1' - read an existing one with
+        /// it in the container's "Contained type", e.g. 'V0.0.7\\Servo_Faceplate_2' - read an existing one with
         /// 'GetHmiScreenItems'. The type must already be in the project library.
         /// </summary>
         public HmiScreenItemBase CreateHmiFaceplate(
@@ -339,7 +339,7 @@ namespace TiaMcpServer.Siemens
                     if (string.IsNullOrWhiteSpace(faceplateType))
                     {
                         throw new PortalException(PortalErrorCode.InvalidParams,
-                            "'faceplateType' is required, e.g. 'FP_Motor V 0.0.1'. 'GetHmiScreenItems' shows the type of faceplates already placed.");
+                            "'faceplateType' is required, e.g. 'V0.0.7\\Servo_Faceplate_2'. 'GetHmiScreenItems' shows the type of faceplates already placed.");
                     }
 
                     var screen = RequireHmiScreen(RequireHmiSoftware(softwarePath), screenName);
@@ -413,8 +413,10 @@ namespace TiaMcpServer.Siemens
         }
 
         /// <summary>
-        /// The dynamization on a faceplate interface property is keyed by the property's own name in
-        /// the samples seen so far; "Value" is tried as well in case this TIA Portal version keys it so.
+        /// Tag-typed interface properties (the usual case, e.g. a servo UDT tag) do not take a
+        /// dynamization - TIA Portal answers "Dynamization type not supported" - but store the tag
+        /// name as their value; that is how existing faceplates in the CPU01 project hold them. A tag
+        /// dynamization is tried first for properties of a simple type, then the value.
         /// </summary>
         private static void BindFaceplateInterfaceTag(HmiFaceplateInterface property, string itemName, string tagName)
         {
@@ -426,11 +428,13 @@ namespace TiaMcpServer.Siemens
             {
                 try
                 {
-                    BindTag(property, itemName, "faceplate interface", "Value", tagName);
+                    property.Value = tagName;
                 }
-                catch (PortalException)
+                catch (Exception ex)
                 {
-                    throw first;
+                    throw new PortalException(PortalErrorCode.InvalidParams,
+                        $"TIA Portal refused HMI tag '{tagName}' for faceplate interface '{itemName}.{property.PropertyName}', " +
+                        $"both as a tag binding and as the property value: {Operation.DescribeChain(ex)}.", null, ex);
                 }
             }
         }
@@ -471,6 +475,23 @@ namespace TiaMcpServer.Siemens
                 null, last);
         }
 
+        /// <summary>
+        /// Text-typed interface values come back as a full ProjectText XML document; only the
+        /// &lt;body&gt; part, as screen item texts show it, is worth returning.
+        /// </summary>
+        private static string? ShortProjectText(string? value)
+        {
+            if (value == null || !value.StartsWith("<?xml", StringComparison.Ordinal))
+            {
+                return value;
+            }
+
+            var start = value.IndexOf("<body", StringComparison.Ordinal);
+            var end = value.LastIndexOf("</body>", StringComparison.Ordinal);
+
+            return start >= 0 && end > start ? value.Substring(start, end - start + "</body>".Length) : value;
+        }
+
         private static HmiFaceplateInterfaceDescription DescribeFaceplateInterface(HmiFaceplateInterface property)
         {
             var binding = property.Dynamizations.FirstOrDefault();
@@ -478,7 +499,7 @@ namespace TiaMcpServer.Siemens
             return new HmiFaceplateInterfaceDescription
             {
                 PropertyName = property.PropertyName,
-                Value = binding == null ? property.Value?.ToString() : null,
+                Value = binding == null ? ShortProjectText(property.Value?.ToString()) : null,
                 Tag = (binding as TagDynamization)?.Tag,
                 DynamizationType = binding?.DynamizationType.ToString()
             };
@@ -739,7 +760,7 @@ namespace TiaMcpServer.Siemens
 
         public List<HmiDynamizationDescription> Dynamizations { get; set; } = new List<HmiDynamizationDescription>();
 
-        /// <summary>Faceplate containers only: the contained faceplate type, e.g. 'FP_Motor V 0.0.1'.</summary>
+        /// <summary>Faceplate containers only: the contained faceplate type, e.g. 'V0.0.7\\Servo_Faceplate_2'.</summary>
         public string? FaceplateType { get; set; }
 
         /// <summary>Faceplate containers only: the interface properties with their static value or bound tag.</summary>

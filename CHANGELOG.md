@@ -9,6 +9,9 @@
   to an HMI tag. `GetHmiScreenItems` now also returns `faceplateType` and `faceplateInterface` for
   faceplate containers, and position/size for window-type items (faceplate containers, screen windows),
   which were empty before (added fields only).
+  Live-tested on CPU01 (`V0.0.7\Servo_Faceplate_2`): tag-typed interface properties refuse a tag
+  dynamization and hold the tag name as their value, so `tag` falls back to that; text interface values
+  are returned as their `<body>` part instead of the whole ProjectText XML.
 
 - __WinCC Unified screen tools__ (REQUESTS.md P9-2): `GetHmiScreenItems` lists the items of one screen
   with kind, position, size, text, IO field process value and tag bindings. With `--allow-write`:
