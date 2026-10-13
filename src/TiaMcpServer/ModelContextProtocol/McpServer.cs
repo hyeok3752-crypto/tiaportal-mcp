@@ -649,14 +649,17 @@ namespace TiaMcpServer.ModelContextProtocol
                     throw new McpException($"Unknown kind '{kind}'. Use 'type' or 'block'.");
                 }
 
-                var names = Directory
+                // An .xml file names its object inside; the file name may differ, since exports
+                // replace characters such as '>' or '/' that a file name cannot hold.
+                var files = Directory
                     .GetFiles(importPath, "*.*", SearchOption.TopDirectoryOnly)
                     .Where(f => PreviewExtensions.Contains(Path.GetExtension(f)))
-                    .Select(f => Path.GetFileNameWithoutExtension(f))
-                    .Where(n => !string.IsNullOrEmpty(n))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                    .Select(f => (File: f, Name: ObjectNameOf(f)))
+                    .Where(x => !string.IsNullOrEmpty(x.Name))
+                    .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.Select(x => x.File).ToList(), StringComparer.OrdinalIgnoreCase);
+
+                var names = files.Keys.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
 
                 var target = string.IsNullOrEmpty(groupPath) ? "the root" : groupPath;
                 var items = new List<ResponseImportPreviewItem>();
@@ -697,13 +700,12 @@ namespace TiaMcpServer.ModelContextProtocol
                 // with no useful reason - found by bisecting a failed import on 2026-10-12.
                 foreach (var item in items)
                 {
-                    var xml = Path.Combine(importPath, item.Name + ".xml");
+                    var problems = files[item.Name!]
+                        .Where(f => Path.GetExtension(f).Equals(".xml", StringComparison.OrdinalIgnoreCase))
+                        .SelectMany(CheckSimaticMl)
+                        .ToList();
 
-                    if (File.Exists(xml))
-                    {
-                        var problems = CheckSimaticMl(xml);
-                        item.Problems = problems.Count > 0 ? problems : null;
-                    }
+                    item.Problems = problems.Count > 0 ? problems : null;
                 }
 
                 var problemFiles = items.Count(i => i.Problems != null);
@@ -739,6 +741,34 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 throw new McpException($"Unexpected error previewing the import of '{importPath}': {ex.Message}", ex);
             }
+        }
+
+        /// <summary>The object name inside a SimaticML file, else the file name without extension.</summary>
+        private static string ObjectNameOf(string file)
+        {
+            if (Path.GetExtension(file).Equals(".xml", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var name = System.Xml.Linq.XDocument.Load(file).Descendants()
+                        .Where(e => e.Name.LocalName.StartsWith("SW.Blocks.", StringComparison.Ordinal)
+                                    || e.Name.LocalName.StartsWith("SW.Types.", StringComparison.Ordinal))
+                        .Select(e => e.Elements().FirstOrDefault(a => a.Name.LocalName == "AttributeList")?
+                            .Elements().FirstOrDefault(n => n.Name.LocalName == "Name")?.Value)
+                        .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
+
+                    if (name != null)
+                    {
+                        return name;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Unreadable: fall back to the file name; CheckSimaticMl reports the XML error.
+                }
+            }
+
+            return Path.GetFileNameWithoutExtension(file);
         }
 
         /// <summary>
@@ -777,7 +807,10 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 networkNo++;
 
+                // NameCon/IdentCon inside a Wire carry the UId of the part they connect - a reference,
+                // not a definition - so they repeat legitimately (live: every clean export has them).
                 foreach (var duplicate in source.Descendants()
+                             .Where(e => e.Name.LocalName != "NameCon" && e.Name.LocalName != "IdentCon")
                              .Select(e => e.Attribute("UId")?.Value)
                              .Where(v => v != null)
                              .GroupBy(v => v!)

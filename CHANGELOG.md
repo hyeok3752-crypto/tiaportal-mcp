@@ -35,6 +35,13 @@
 
 ### Fixed
 
+- __Live-test fixes (f490ded exe)__: `PreviewImport` flagged every clean LAD export because wire
+  `NameCon`/`IdentCon` repeat part UIds by design - they no longer count; items are now named by the
+  object name inside the XML, not the (possibly sanitised) file name. `SetHmiFaceplateInterface` with
+  `tag` failed with "Commit of a Transaction is not allowed after an exception": a refused dynamization
+  attempt poisons the tool transaction, so the tag is now written as the interface value directly, and
+  a static `value` is converted to the current value's type and written once.
+
 - __Exports of objects whose names are not valid file names__: TIA Portal allows names such as
   `T_Data->HMI` or `GTS_EQ_I/FLower`; every export, `GetBlockSource`/`GetTypeSource`, `FindInCode` and
   `ExportXmlBlocks` with a broad regex failed with "Illegal characters in path" on them (REQUESTS.md

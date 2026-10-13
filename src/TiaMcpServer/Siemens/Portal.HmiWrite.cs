@@ -413,66 +413,59 @@ namespace TiaMcpServer.Siemens
         }
 
         /// <summary>
-        /// Tag-typed interface properties (the usual case, e.g. a servo UDT tag) do not take a
-        /// dynamization - TIA Portal answers "Dynamization type not supported" - but store the tag
-        /// name as their value; that is how existing faceplates in the CPU01 project hold them. A tag
-        /// dynamization is tried first for properties of a simple type, then the value.
+        /// Faceplate interface properties take an HMI tag as their value: TIA Portal refuses a tag
+        /// dynamization on them ("Dynamization type not supported"), and existing faceplates in the
+        /// CPU01 project hold the tag name as the value. The value is set directly - trying the
+        /// dynamization first is not an option, because any exception inside the tool's transaction
+        /// makes TIA Portal refuse the commit (live, 2026-10-13).
         /// </summary>
         private static void BindFaceplateInterfaceTag(HmiFaceplateInterface property, string itemName, string tagName)
         {
             try
             {
-                BindTag(property, itemName, "faceplate interface", property.PropertyName, tagName);
+                property.Value = tagName;
             }
-            catch (PortalException first) when (first.Code == PortalErrorCode.InvalidParams)
+            catch (Exception ex)
             {
-                try
-                {
-                    property.Value = tagName;
-                }
-                catch (Exception ex)
-                {
-                    throw new PortalException(PortalErrorCode.InvalidParams,
-                        $"TIA Portal refused HMI tag '{tagName}' for faceplate interface '{itemName}.{property.PropertyName}', " +
-                        $"both as a tag binding and as the property value: {Operation.DescribeChain(ex)}.", null, ex);
-                }
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"TIA Portal refused HMI tag '{tagName}' for faceplate interface '{itemName}.{property.PropertyName}': " +
+                    $"{Operation.DescribeChain(ex)}.", null, ex);
             }
         }
 
         /// <summary>
-        /// The interface value is typed by the faceplate (Bool, Int, String, ...) but exposed as object;
-        /// the string is tried first, then the same text as bool, integer and number.
+        /// The interface value is typed by the faceplate (Bool, Int, String, ...) but exposed as object.
+        /// The text is converted to the type of the current value and written once: a failed write
+        /// inside the tool's transaction would make TIA Portal refuse the commit, so there is no
+        /// trial and error here.
         /// </summary>
         private static void SetInterfaceValue(HmiFaceplateInterface property, string value)
         {
-            var candidates = new List<object> { value };
+            var current = property.Value;
+            object converted;
 
-            if (bool.TryParse(value, out var b)) candidates.Add(b);
-            if (long.TryParse(value, out var l))
+            try
             {
-                candidates.Add((int)l);
-                candidates.Add(l);
+                converted = current == null || current is string
+                    ? value
+                    : Convert.ChangeType(value, current.GetType(), System.Globalization.CultureInfo.InvariantCulture);
             }
-            if (double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d)) candidates.Add(d);
-
-            Exception? last = null;
-
-            foreach (var candidate in candidates)
+            catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is OverflowException)
             {
-                try
-                {
-                    property.Value = candidate;
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    last = ex;
-                }
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"'{value}' is not a valid {current!.GetType().Name} for faceplate interface '{property.PropertyName}'.", null, ex);
             }
 
-            throw new PortalException(PortalErrorCode.InvalidParams,
-                $"TIA Portal refused value '{value}' for faceplate interface '{property.PropertyName}': {Operation.DescribeChain(last!)}.",
-                null, last);
+            try
+            {
+                property.Value = converted;
+            }
+            catch (Exception ex)
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"TIA Portal refused value '{value}' for faceplate interface '{property.PropertyName}': {Operation.DescribeChain(ex)}.",
+                    null, ex);
+            }
         }
 
         /// <summary>
