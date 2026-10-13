@@ -676,8 +676,10 @@ namespace TiaMcpServer.ModelContextProtocol
                         continue;
                     }
 
+                    var existingGroup = GroupOf(existing.Path, existing.Name);
+
                     var sameGroup = string.Equals(
-                        Parent(existing.Path),
+                        existingGroup,
                         StripLeadingSystemFolder(groupPath, isType),
                         StringComparison.OrdinalIgnoreCase);
 
@@ -691,7 +693,7 @@ namespace TiaMcpServer.ModelContextProtocol
                             ? "Already exists in the target group; importOption 'Override' replaces it."
                             : isType
                                 ? "A PLC data type name must be unique across the whole PLC. This import fails even with " +
-                                  $"'Override' - target '{Parent(existing.Path)}' instead, or rename the type."
+                                  $"'Override' - target '{existingGroup}' instead, or rename the type."
                                 : $"A block of this name already exists at '{existing.Path}'; importing here may collide on the block number."
                     });
                 }
@@ -842,6 +844,30 @@ namespace TiaMcpServer.ModelContextProtocol
 
         private static string Join(string groupPath, string name) =>
             string.IsNullOrEmpty(groupPath) ? name : $"{groupPath.TrimEnd('/')}/{name}";
+
+        /// <summary>
+        /// The group part of a resolved path. A block or type name may itself contain '/'
+        /// (live: 'GTS_EQ_I/FLower'), so strip the known name instead of splitting at the last '/'.
+        /// </summary>
+        private static string GroupOf(string path, string? name)
+        {
+            if (!string.IsNullOrEmpty(name))
+            {
+                if (string.Equals(path, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.Empty;
+                }
+
+                var suffix = "/" + name;
+
+                if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return path.Substring(0, path.Length - suffix.Length);
+                }
+            }
+
+            return Parent(path);
+        }
 
         private static string Parent(string path)
         {

@@ -1992,6 +1992,208 @@ Use the DisconnectFromSubnet tool with these parameters:
 
         #endregion
 
+        #region HMI Templates
+
+        [McpServerPrompt(Name = "GetHmiScreenItems"), Description("List the items of one WinCC Unified screen")]
+        public static string GetHmiScreenItems(string softwarePath, string screenName, string regexName = "")
+        {
+            return $@"List the items of one WinCC Unified screen with kind, position, size, text, tag bindings and, for faceplates, the faceplate type and interface values.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen, as GetHmiScreens lists it
+- regexName: optional name or regular expression to filter the items; empty lists all
+
+Use the GetHmiScreenItems tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}{OptionalParameter("regexName", regexName)}";
+        }
+
+        [McpServerPrompt(Name = "CreateHmiScreen"), Description("Create a WinCC Unified screen")]
+        public static string CreateHmiScreen(string softwarePath, string name, string width = "", string height = "", string screenNumber = "")
+        {
+            return $@"Create a new screen in a WinCC Unified HMI software.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- name: name of the new screen
+- width, height: optional size in pixels; empty keeps the device default
+- screenNumber: optional screen number
+
+Use the CreateHmiScreen tool with these parameters:
+- softwarePath: {softwarePath}
+- name: {name}{OptionalParameter("width", width)}{OptionalParameter("height", height)}{OptionalParameter("screenNumber", screenNumber)}";
+        }
+
+        [McpServerPrompt(Name = "DeleteHmiScreen"), Description("Delete a WinCC Unified screen")]
+        public static string DeleteHmiScreen(string softwarePath, string screenName)
+        {
+            return $@"Delete one screen of a WinCC Unified HMI software.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen to delete
+
+Use the DeleteHmiScreen tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}";
+        }
+
+        [McpServerPrompt(Name = "CreateHmiScreenItem"), Description("Create an item on a WinCC Unified screen")]
+        public static string CreateHmiScreenItem(string softwarePath, string screenName, string kind, string name, string left = "", string top = "", string width = "", string height = "", string text = "", string tag = "")
+        {
+            return $@"Create a button, IO field, text, label, rectangle or other item on a WinCC Unified screen, optionally with a text and a process tag.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen
+- kind: item kind, e.g. 'Button', 'IOField', 'Text', 'Label', 'Rectangle'
+- name: name of the new item
+- left, top, width, height: optional position and size in pixels
+- text: optional text; plain text is accepted
+- tag: optional HMI tag for the process value
+
+Use the CreateHmiScreenItem tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- kind: {kind}
+- name: {name}{OptionalParameter("left", left)}{OptionalParameter("top", top)}{OptionalParameter("width", width)}{OptionalParameter("height", height)}{OptionalParameter("text", text)}{OptionalParameter("tag", tag)}";
+        }
+
+        [McpServerPrompt(Name = "UpdateHmiScreenItem"), Description("Change position, size, text or visibility of a screen item")]
+        public static string UpdateHmiScreenItem(string softwarePath, string screenName, string itemName, string left = "", string top = "", string width = "", string height = "", string text = "", string visible = "")
+        {
+            return $@"Change the position, size, text or visibility of an item on a WinCC Unified screen. Only the values given are changed.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen
+- itemName: name of the item
+- left, top, width, height: optional new position and size in pixels
+- text: optional new text
+- visible: optional 'true' or 'false'
+
+Use the UpdateHmiScreenItem tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}{OptionalParameter("left", left)}{OptionalParameter("top", top)}{OptionalParameter("width", width)}{OptionalParameter("height", height)}{OptionalParameter("text", text)}{OptionalParameter("visible", visible)}";
+        }
+
+        [McpServerPrompt(Name = "DeleteHmiScreenItem"), Description("Delete an item from a WinCC Unified screen")]
+        public static string DeleteHmiScreenItem(string softwarePath, string screenName, string itemName)
+        {
+            return $@"Delete one item from a WinCC Unified screen.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen
+- itemName: name of the item to delete
+
+Use the DeleteHmiScreenItem tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}";
+        }
+
+        [McpServerPrompt(Name = "BindHmiTag"), Description("Bind an HMI tag to a property of a screen item")]
+        public static string BindHmiTag(string softwarePath, string screenName, string itemName, string propertyName, string tagName)
+        {
+            return $@"Bind an HMI tag to a property of a WinCC Unified screen item as a tag dynamization.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen
+- itemName: name of the item
+- propertyName: property to dynamize, e.g. 'ProcessValue' or 'Visible'
+- tagName: name of the HMI tag
+
+Use the BindHmiTag tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}
+- propertyName: {propertyName}
+- tagName: {tagName}";
+        }
+
+        [McpServerPrompt(Name = "CreateHmiFaceplate"), Description("Place a faceplate on a WinCC Unified screen")]
+        public static string CreateHmiFaceplate(string softwarePath, string screenName, string name, string faceplateType, string left = "", string top = "", string width = "", string height = "")
+        {
+            return $@"Place an instance of a faceplate type on a WinCC Unified screen.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen
+- name: name of the new faceplate container
+- faceplateType: faceplate type with version, e.g. 'V0.0.7\Servo_Faceplate_2'
+- left, top, width, height: optional position and size in pixels
+
+Use the CreateHmiFaceplate tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- name: {name}
+- faceplateType: {faceplateType}{OptionalParameter("left", left)}{OptionalParameter("top", top)}{OptionalParameter("width", width)}{OptionalParameter("height", height)}";
+        }
+
+        [McpServerPrompt(Name = "SetHmiFaceplateInterface"), Description("Set a faceplate interface property to a value or tag")]
+        public static string SetHmiFaceplateInterface(string softwarePath, string screenName, string itemName, string propertyName, string value = "", string tag = "")
+        {
+            return $@"Set one interface property of a placed faceplate to a constant value or to an HMI tag. Give exactly one of value and tag.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen
+- itemName: name of the faceplate container
+- propertyName: interface property name, as GetHmiScreenItems lists it
+- value: constant value
+- tag: name of the HMI tag
+
+Use the SetHmiFaceplateInterface tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}
+- propertyName: {propertyName}{OptionalParameter("value", value)}{OptionalParameter("tag", tag)}";
+        }
+
+        [McpServerPrompt(Name = "CreateHmiTag"), Description("Create a WinCC Unified HMI tag")]
+        public static string CreateHmiTag(string softwarePath, string tagTablePath, string name, string dataType = "", string connection = "", string plcTag = "")
+        {
+            return $@"Create an HMI tag in a WinCC Unified tag table, either internal or connected to a PLC tag.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- tagTablePath: name or path of the HMI tag table, e.g. 'Internal Tag'
+- name: name of the new tag
+- dataType: optional data type; empty means Int
+- connection: optional HMI connection for an external tag
+- plcTag: optional PLC tag the external tag reads
+
+Use the CreateHmiTag tool with these parameters:
+- softwarePath: {softwarePath}
+- tagTablePath: {tagTablePath}
+- name: {name}{OptionalParameter("dataType", dataType)}{OptionalParameter("connection", connection)}{OptionalParameter("plcTag", plcTag)}";
+        }
+
+        #endregion
+
+        #region Compare Templates
+
+        [McpServerPrompt(Name = "CompareExports"), Description("Compare two export folders file by file")]
+        public static string CompareExports(string pathA, string pathB, string regexName = "")
+        {
+            return $@"Compare two export folders and list files only in one of them and files that differ, with the changed line range. Ignores the SimaticML export timestamp and line endings. TIA Portal is not needed.
+
+Common parameter values:
+- pathA: the first export folder, e.g. before a change
+- pathB: the second export folder, e.g. after a change
+- regexName: optional regular expression on the relative file path; empty compares every file
+
+Use the CompareExports tool with these parameters:
+- pathA: {pathA}
+- pathB: {pathB}{OptionalParameter("regexName", regexName)}";
+        }
+
+        #endregion
+
         #region Device Write Templates
 
         [McpServerPrompt(Name = "CreateDevice"), Description("Create a new single-item hardware device")]

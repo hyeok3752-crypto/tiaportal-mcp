@@ -66,14 +66,25 @@ namespace TiaMcpServer.ModelContextProtocol
         public static ResponseBlocks GetBlocks(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("regexName: defines the name or regular expression to find the block, matched anywhere in the block name ('G3U' also matches G3U10..G3U12; anchor with ^...$ for an exact name). Use empty string (default) to find all")] string regexName = "",
-            [Description("includeAttributes: return every Openness attribute of each block (about 30 each). Default true. Pass false on a large PLC when only names and paths are needed - reading the attributes is most of this tool's run time")] bool includeAttributes = true)
+            [Description("includeAttributes: return every Openness attribute of each block (about 30 each). Default true. Pass false on a large PLC when only names and paths are needed - reading the attributes is most of this tool's run time")] bool includeAttributes = true,
+            [Description("offset: number of matching blocks to skip, for paging through a large PLC. Default 0")] int offset = 0,
+            [Description("limit: maximum number of blocks to return; 0 (default) returns all. 'totalCount' in the reply is the number of matches before paging")] int limit = 0)
         {
             try
             {
+                if (offset < 0 || limit < 0)
+                {
+                    throw new McpException("offset and limit must not be negative.");
+                }
+
                 var list = Portal.GetBlocks(softwarePath, regexName);
 
+                var matches = list?.Where(b => b != null).ToList() ?? new List<PlcBlock>();
+                var page = matches.Skip(offset).Take(limit > 0 ? limit : int.MaxValue).ToList();
+                var paged = offset > 0 || (limit > 0 && matches.Count > limit);
+
                 var responseList = new List<ResponseBlockInfo>();
-                foreach (var block in list)
+                foreach (var block in page)
                 {
                     if (block != null)
                     {
@@ -101,8 +112,10 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     return new ResponseBlocks
                     {
-                        Message = $"Blocks with regex '{regexName}' retrieved from '{softwarePath}'",
+                        Message = $"Blocks with regex '{regexName}' retrieved from '{softwarePath}'" +
+                                  (paged ? $" - returned {responseList.Count} of {matches.Count} starting at {offset}" : string.Empty),
                         Items = responseList,
+                        TotalCount = matches.Count,
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,

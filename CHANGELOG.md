@@ -4,6 +4,15 @@
 
 ### Added
 
+- __CompareExports__ (REQUESTS.md P7): compares two export folders by relative path and lists files only
+  in one folder and changed files with the changed line range, lines added/removed and a short excerpt
+  of each side. Ignores the SimaticML `<DocumentInfo>` export timestamp, line endings and trailing
+  blanks. Reads files only - no TIA Portal connection or lock needed.
+- __GetBlocks paging__ (P5): optional `offset` and `limit`; the reply gets `totalCount` (added field), the
+  number of matches before paging. Attributes are read for the returned page only.
+- __Prompts for the HMI tools__: the ten WinCC Unified tools had no prompt of the same name, which
+  `Test_708_EveryTool_HasAPromptOfTheSameName` requires.
+
 - __PreviewImport checks the files themselves__ (REQUESTS.md P12-2): duplicate `ID`s in a SimaticML file,
   duplicate `UId`s within one network, and a `ConstantType` on an SCL Bool literal - the three causes of
   silent import rejections found on 2026-10-12. Reported per item as `problems` and counted in
@@ -34,6 +43,10 @@
   reports the active presets. Prompts are unchanged.
 
 ### Fixed
+
+- __PreviewImport with '/' in a block name__: a block named like `GTS_EQ_I/FLower` was reported as
+  `overwrite-elsewhere` although it is in the target group, because its group was taken as the text
+  before the last '/'. The group is now the resolved path minus the known name.
 
 - __Live-test fixes (f490ded exe)__: `PreviewImport` flagged every clean LAD export because wire
   `NameCon`/`IdentCon` repeat part UIds by design - they no longer count; items are now named by the

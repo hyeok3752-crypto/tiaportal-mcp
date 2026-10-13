@@ -428,6 +428,9 @@ namespace TiaMcpServer.ModelContextProtocol
     public class ResponseBlocks : ResponseMessage
     {
         public IEnumerable<ResponseBlockInfo>? Items { get; set; }
+
+        /// <summary>Number of matching blocks before offset/limit paging.</summary>
+        public int TotalCount { get; set; }
     }
 
     public class ResponseExportXmlBlock : ResponseMessage
