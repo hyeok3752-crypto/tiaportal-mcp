@@ -25,6 +25,10 @@
 - __Errors no longer end at "<Tool> failed"__: an unexpected Openness exception inside any operation
   now carries its exception chain in the message (`BindHmiTag failed: EngineeringTargetInvocationException: ...`).
   `BindHmiTag` also says which property/tag it could not bind and what to check.
+- __HMI Label__: `CreateHmiScreenItem` kind `Label` failed with "Not supported" (HmiLabel cannot be
+  created); it now creates TIA Portal's "Text field" (HmiTextBox, a subclass of HmiLabel).
+- __Binding to a missing HMI tag__: TIA Portal accepts it silently; `BindHmiTag` and `CreateHmiScreenItem`
+  with `tag` now start their message with a WARNING when no tag table holds that name.
 
 - __Compile and block import say when TIA Portal is online__: both fail while the engineering station is
   online with the PLC (live, 2026-10-13), and TIA's exception does not say so. The error now ends with "go

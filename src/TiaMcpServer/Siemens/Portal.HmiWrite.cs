@@ -139,7 +139,9 @@ namespace TiaMcpServer.Siemens
         {
             ["Button"] = nameof(HmiButton),
             ["IOField"] = nameof(HmiIOField),
-            ["Label"] = nameof(HmiLabel),
+            // HmiLabel itself is refused by Create ("Not supported"); TIA Portal's "Text field" is
+            // HmiTextBox, which derives from HmiLabel, so that is what a Label is created as.
+            ["Label"] = nameof(HmiTextBox),
             ["Text"] = nameof(HmiText),
             ["Rectangle"] = nameof(HmiRectangle)
         };
@@ -216,7 +218,7 @@ namespace TiaMcpServer.Siemens
                     {
                         nameof(HmiButton) => screen.ScreenItems.Create<HmiButton>(name),
                         nameof(HmiIOField) => screen.ScreenItems.Create<HmiIOField>(name),
-                        nameof(HmiLabel) => screen.ScreenItems.Create<HmiLabel>(name),
+                        nameof(HmiTextBox) => screen.ScreenItems.Create<HmiTextBox>(name),
                         nameof(HmiText) => screen.ScreenItems.Create<HmiText>(name),
                         _ => screen.ScreenItems.Create<HmiRectangle>(name)
                     };
@@ -351,6 +353,29 @@ namespace TiaMcpServer.Siemens
         #endregion
 
         #region helpers
+
+        /// <summary>
+        /// Whether an HMI tag of that name exists in any tag table. TIA Portal accepts a binding to
+        /// a missing tag without complaint (it only shows red in the editor), so the bind tools use
+        /// this to warn rather than to refuse - system tags are not in the tag tables.
+        /// </summary>
+        public bool HmiTagExists(string softwarePath, string tagName)
+        {
+            return Operation.Run(_logger, nameof(HmiTagExists), PortalErrorCode.NotFound,
+                () =>
+                {
+                    var hmi = RequireHmiSoftware(softwarePath);
+
+                    return hmi.TagTables.Any(t => TableHasTag(t, tagName))
+                        || hmi.TagTableGroups.Any(g => GroupHasTag(g, tagName));
+                });
+        }
+
+        private static bool TableHasTag(HmiTagTable table, string tagName) =>
+            table.Tags.Any(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+
+        private static bool GroupHasTag(HmiTagTableGroup group, string tagName) =>
+            group.TagTables.Any(t => TableHasTag(t, tagName)) || group.Groups.Any(g => GroupHasTag(g, tagName));
 
         private HmiSoftware RequireHmiSoftware(string softwarePath)
         {

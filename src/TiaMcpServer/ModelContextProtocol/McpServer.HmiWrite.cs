@@ -93,7 +93,7 @@ namespace TiaMcpServer.ModelContextProtocol
         public static ResponseHmiScreenItemWrite CreateHmiScreenItem(
             [Description(HmiPathDescription)] string softwarePath,
             [Description("screenName: name of the screen")] string screenName,
-            [Description("kind: Button, IOField, Label, Text or Rectangle")] string kind,
+            [Description("kind: Button, IOField, Label, Text or Rectangle. Label is created as TIA Portal's 'Text field' (HmiTextBox)")] string kind,
             [Description("name: name of the new item, unique on the screen")] string name,
             [Description("left: optional x position in pixels")] int? left = null,
             [Description("top: optional y position in pixels")] int? top = null,
@@ -105,7 +105,7 @@ namespace TiaMcpServer.ModelContextProtocol
             return Guarded(nameof(CreateHmiScreenItem), () =>
             {
                 var item = Portal.CreateHmiScreenItem(softwarePath, screenName, kind, name, left, top, width, height, text, tag);
-                return HmiItemWritten($"{kind} '{name}' created on screen '{screenName}'.", item);
+                return HmiItemWritten(MissingTagWarning(softwarePath, tag) + $"{kind} '{name}' created on screen '{screenName}'.", item);
             });
         }
 
@@ -158,7 +158,7 @@ namespace TiaMcpServer.ModelContextProtocol
             return Guarded(nameof(BindHmiTag), () =>
             {
                 var item = Portal.BindHmiTag(softwarePath, screenName, itemName, propertyName, tagName);
-                return HmiItemWritten($"'{itemName}.{propertyName}' on screen '{screenName}' bound to HMI tag '{tagName}'.", item);
+                return HmiItemWritten(MissingTagWarning(softwarePath, tagName) + $"'{itemName}.{propertyName}' on screen '{screenName}' bound to HMI tag '{tagName}'.", item);
             });
         }
 
@@ -199,6 +199,11 @@ namespace TiaMcpServer.ModelContextProtocol
                 };
             });
         }
+
+        private static string MissingTagWarning(string softwarePath, string? tagName) =>
+            string.IsNullOrEmpty(tagName) || Portal.HmiTagExists(softwarePath, tagName!)
+                ? string.Empty
+                : $"WARNING: no HMI tag named '{tagName}' in the tag tables of '{softwarePath}' (TIA Portal keeps the binding anyway; it shows red until the tag exists - check 'GetHmiTags'). ";
 
         private static ResponseHmiScreenItemWrite HmiItemWritten(string what, global::Siemens.Engineering.HmiUnified.UI.Base.HmiScreenItemBase item) => new ResponseHmiScreenItemWrite
         {
