@@ -99,7 +99,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("top: optional y position in pixels")] int? top = null,
             [Description("width: optional width in pixels")] uint? width = null,
             [Description("height: optional height in pixels")] uint? height = null,
-            [Description("text: optional text for a Button, Label or Text, written to every project language")] string? text = null,
+            [Description("text: optional text for a Button, Label or Text, written to every project language. Plain text is stored as '<body><p>...</p></body>'; pass '<body>...' yourself for formatted text")] string? text = null,
             [Description("tag: optional HMI tag to bind to an IOField's ProcessValue. For other properties use 'BindHmiTag'")] string? tag = null)
         {
             return Guarded(nameof(CreateHmiScreenItem), () =>
@@ -120,7 +120,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("top: optional new y position in pixels")] int? top = null,
             [Description("width: optional new width in pixels")] uint? width = null,
             [Description("height: optional new height in pixels")] uint? height = null,
-            [Description("text: optional new text for a Button, Label or Text, written to every project language")] string? text = null,
+            [Description("text: optional new text for a Button, Label or Text, written to every project language. Plain text is stored as '<body><p>...</p></body>'")] string? text = null,
             [Description("visible: optional new visibility")] bool? visible = null)
         {
             return Guarded(nameof(UpdateHmiScreenItem), () =>
@@ -169,7 +169,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description(HmiPathDescription)] string softwarePath,
             [Description("tagTablePath: HMI tag table, as 'GetHmiTagTables' lists it, e.g. 'Default tag table'")] string tagTablePath,
             [Description("name: name of the new HMI tag")] string name,
-            [Description("dataType: optional data type, e.g. 'Bool' or 'Int'. Required for an internal tag; a PLC-linked tag takes the PLC tag's type by default")] string? dataType = null,
+            [Description("dataType: optional data type, e.g. 'Bool' or 'Int'. An internal tag without one becomes Int; a PLC-linked tag takes the PLC tag's type by default")] string? dataType = null,
             [Description("connection: optional HMI connection name, e.g. 'HMI_Connection_1'")] string? connection = null,
             [Description("plcTag: optional PLC tag, e.g. '\"MainAssy\".Mode.Dry_Run' or 'Tag_1'")] string? plcTag = null)
         {

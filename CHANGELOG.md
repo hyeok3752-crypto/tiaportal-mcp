@@ -18,6 +18,14 @@
 
 ### Fixed
 
+- __HMI screen item text__: `CreateHmiScreenItem`/`UpdateHmiScreenItem` with `text` failed for every
+  Button, Label and Text, because WinCC Unified stores screen texts as rich text
+  (`<body><p>USE</p></body>`) and rejects a plain string. Plain text is now wrapped; text that already
+  starts with `<body` is written as given. Found in the first live test on the CPU01 project.
+- __Errors no longer end at "<Tool> failed"__: an unexpected Openness exception inside any operation
+  now carries its exception chain in the message (`BindHmiTag failed: EngineeringTargetInvocationException: ...`).
+  `BindHmiTag` also says which property/tag it could not bind and what to check.
+
 - __Compile and block import say when TIA Portal is online__: both fail while the engineering station is
   online with the PLC (live, 2026-10-13), and TIA's exception does not say so. The error now ends with "go
   offline first" when the PLC's online state is Online or Connecting.

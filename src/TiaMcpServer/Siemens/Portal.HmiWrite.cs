@@ -444,9 +444,16 @@ namespace TiaMcpServer.Siemens
                     "The item's text has no project language to write to. Check the project languages in TIA Portal.");
             }
 
+            // Unified screen texts are rich text: TIA Portal stores "<body><p>USE</p></body>" and
+            // rejects a plain string. Plain input is wrapped; input that is already "<body>..." is
+            // written as given so formatted text can be passed through.
+            var value = text.TrimStart().StartsWith("<body", StringComparison.OrdinalIgnoreCase)
+                ? text
+                : $"<body><p>{System.Security.SecurityElement.Escape(text)}</p></body>";
+
             foreach (var entry in target.Items)
             {
-                entry.Text = text;
+                entry.Text = value;
             }
         }
 
@@ -466,8 +473,18 @@ namespace TiaMcpServer.Siemens
                     $"'{item.Name}.{propertyName}' already has a {existing.DynamizationType} dynamization; remove it in TIA Portal first.");
             }
 
-            var created = item.Dynamizations.Create<TagDynamization>(propertyName);
-            created.Tag = tagName;
+            try
+            {
+                var created = item.Dynamizations.Create<TagDynamization>(propertyName);
+                created.Tag = tagName;
+            }
+            catch (Exception ex) when (ex is not PortalException)
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"TIA Portal refused to bind '{item.Name}.{propertyName}' to HMI tag '{tagName}': {Operation.DescribeChain(ex)}. " +
+                    $"Check that a {KindOf(item)} has a property '{propertyName}' (e.g. a Rectangle has BackColor and BorderColor, no ForeColor) " +
+                    "and that the tag exists ('GetHmiTags').", null, ex);
+            }
         }
 
         private static string KindOf(HmiScreenItemBase item)
