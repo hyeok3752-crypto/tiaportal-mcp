@@ -6,5 +6,6 @@
         public bool? IsConnected { get; set; }
         public string? Project { get; set; }
         public string? Session { get; set; }
+        public OperationProgress? Progress { get; set; }
     }
 }

@@ -523,12 +523,21 @@ Use the ImportExternalSource tool with these parameters:
 
         #region Project and Session Templates
 
-        [McpServerPrompt(Name = "GetState"), Description("Show connection, open project and write mode")]
-        public static string GetState()
+        [McpServerPrompt(Name = "GetState"), Description("Show connection, open project, write mode and any in-progress call")]
+        public static string GetState(string portalId = "")
         {
+            var usage = string.IsNullOrWhiteSpace(portalId)
+                ? "Use the GetState tool (it takes no required parameters)."
+                : "Use the GetState tool with this parameter:" + OptionalParameter("portalId", portalId);
+
             return $@"Get the state of the TIA Portal MCP server.
 
-Use the GetState tool (it takes no parameters).";
+Also reports 'progress' while a long-running call (e.g. FindInCode) is in flight on this instance - call this from a second request to check whether such a call looks stuck or just slow, without waiting for it to finish. Unlike other tools, GetState never waits for a busy instance.
+
+Common parameter values:
+- portalId: process id of the TIA Portal instance to report on (see GetPortals); leave empty when at most one instance is attached
+
+{usage}";
         }
 
         [McpServerPrompt(Name = "GetProject"), Description("Show the open project or session")]

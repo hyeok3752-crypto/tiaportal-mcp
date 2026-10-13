@@ -27,6 +27,17 @@ namespace TiaMcpServer.Siemens
 
         public SemaphoreSlim Gate { get; } = new SemaphoreSlim(1, 1);
 
+        // Written by the thread running the current request's tool body, read by 'GetState' from
+        // whatever thread is handling that call - neither takes Gate, so this stays visible while
+        // a long call is in flight. OperationProgress is immutable; a new instance is swapped in
+        // on each update instead of mutating one in place, so a concurrent read never sees a
+        // half-written value.
+        private volatile OperationProgress? _progress;
+
+        public OperationProgress? Progress => _progress;
+
+        internal void SetProgress(OperationProgress? progress) => _progress = progress;
+
         // written from the Openness thread that raises Disposed
         private volatile bool _isDisposed;
 

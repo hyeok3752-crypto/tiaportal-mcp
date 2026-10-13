@@ -94,34 +94,50 @@ namespace TiaMcpServer.Siemens
 
                     result.ObjectsSearched = targets.Count;
 
-                    foreach (var target in targets)
+                    // Each target is exported individually, so a big, unfiltered PLC can take
+                    // minutes - 'GetState' reports this while it runs so a caller stuck on a
+                    // busy error can tell "still working" from "looks stuck".
+                    BeginProgress(nameof(FindInCode), targets.Count);
+
+                    try
                     {
-                        if (result.Items.Count >= maxResults)
+                        for (var t = 0; t < targets.Count; t++)
                         {
-                            result.Truncated = true;
+                            var target = targets[t];
 
-                            break;
+                            if (result.Items.Count >= maxResults)
+                            {
+                                result.Truncated = true;
+
+                                break;
+                            }
+
+                            ReportProgress(t, target.Path);
+
+                            SourceTextResult source;
+
+                            try
+                            {
+                                source = target.IsBlock
+                                    ? GetBlockSource(softwarePath, target.Path, "document", int.MaxValue)
+                                    : GetTypeSource(softwarePath, target.Path, "document", int.MaxValue);
+                            }
+                            catch (Exception ex)
+                            {
+                                // One unreadable object must not end the search; know-how protection
+                                // and export refusals are both normal on a real PLC.
+                                result.Unsearchable.Add($"{target.Path}: {ex.Message}");
+                                _logger?.LogDebug(ex, "Skipping '{Path}' during code search", target.Path);
+
+                                continue;
+                            }
+
+                            AddMatches(result, target.Path, source, regex, maxResults);
                         }
-
-                        SourceTextResult source;
-
-                        try
-                        {
-                            source = target.IsBlock
-                                ? GetBlockSource(softwarePath, target.Path, "document", int.MaxValue)
-                                : GetTypeSource(softwarePath, target.Path, "document", int.MaxValue);
-                        }
-                        catch (Exception ex)
-                        {
-                            // One unreadable object must not end the search; know-how protection
-                            // and export refusals are both normal on a real PLC.
-                            result.Unsearchable.Add($"{target.Path}: {ex.Message}");
-                            _logger?.LogDebug(ex, "Skipping '{Path}' during code search", target.Path);
-
-                            continue;
-                        }
-
-                        AddMatches(result, target.Path, source, regex, maxResults);
+                    }
+                    finally
+                    {
+                        EndProgress();
                     }
 
                     _logger?.LogInformation(

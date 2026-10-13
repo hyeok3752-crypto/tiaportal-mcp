@@ -93,6 +93,37 @@ namespace TiaMcpServer.Siemens
 
         public int? CurrentPortalId => Current?.Id;
 
+        /// <summary>
+        /// Marks the start of a long-running, iterative tool call on the current request's
+        /// instance, so 'GetState' can show progress while it runs. Callers must call
+        /// <see cref="EndProgress"/> in a finally block - this does not know when the enclosing
+        /// Operation.Run body returns, successfully or not.
+        /// </summary>
+        internal void BeginProgress(string tool, int? total)
+        {
+            Current?.SetProgress(new OperationProgress(tool, DateTime.Now, total, 0, null, DateTime.Now));
+        }
+
+        /// <summary>Updates the progress started by <see cref="BeginProgress"/>. A no-op if none was started on this context.</summary>
+        internal void ReportProgress(int processed, string? currentPath = null)
+        {
+            var context = Current;
+            var existing = context?.Progress;
+
+            if (context == null || existing == null)
+            {
+                return;
+            }
+
+            context.SetProgress(existing.WithProgress(processed, currentPath, DateTime.Now));
+        }
+
+        /// <summary>Clears the progress started by <see cref="BeginProgress"/>.</summary>
+        internal void EndProgress()
+        {
+            Current?.SetProgress(null);
+        }
+
         #region instances
 
         public List<PortalInstance> GetPortals()
@@ -200,9 +231,16 @@ namespace TiaMcpServer.Siemens
 
             if (!await context.Gate.WaitAsync(GateTimeout, cancellationToken).ConfigureAwait(false))
             {
+                var progress = context.Progress;
+                var detail = progress != null
+                    ? $" Currently running: {progress.Describe()}."
+                    : Operation.IsGloballyBusy()
+                        ? " No operation is recorded on this instance, but a call on another attached TIA Portal instance is currently holding the shared Openness lock and may be the real cause - see 'GetPortals' for what else is attached."
+                        : string.Empty;
+
                 throw new PortalException(PortalErrorCode.InvalidState,
                     $"TIA Portal instance {context.Id} has been busy with another request for more than " +
-                    $"{GateTimeout.TotalSeconds:0} s - possibly a dialog is waiting in TIA Portal. Close it or retry later.");
+                    $"{GateTimeout.TotalSeconds:0} s - possibly a dialog is waiting in TIA Portal. Close it or retry later.{detail}");
             }
 
             try

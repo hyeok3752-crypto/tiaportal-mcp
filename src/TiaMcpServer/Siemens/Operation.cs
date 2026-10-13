@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System;
+using System.Threading;
 
 namespace TiaMcpServer.Siemens
 {
@@ -122,6 +123,25 @@ namespace TiaMcpServer.Siemens
             }
 
             return pex;
+        }
+
+        /// <summary>
+        /// Non-blocking check for whether some call, on any attached instance, is currently
+        /// inside Run/TryRun. This lock is shared across every TIA Portal instance (see the
+        /// remark on <see cref="Gate"/>), so a request stuck waiting on its own instance's
+        /// PortalContext.Gate may actually be queued behind a different instance's call holding
+        /// this one. Used only to add that possibility to a busy-timeout message - never to make
+        /// a decision, since "stuck" vs. "just slow" still has to be judged by whoever reads it.
+        /// </summary>
+        internal static bool IsGloballyBusy()
+        {
+            if (Monitor.TryEnter(Gate, 0))
+            {
+                Monitor.Exit(Gate);
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>

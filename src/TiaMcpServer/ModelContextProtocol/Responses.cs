@@ -246,6 +246,25 @@ namespace TiaMcpServer.ModelContextProtocol
         /// '--preserve-path'); a call may omit them. Null when no preset is configured.
         /// </summary>
         public System.Text.Json.Nodes.JsonObject? Presets { get; set; }
+
+        /// <summary>
+        /// Set while a long-running, iterative tool call (e.g. 'FindInCode') is in progress on
+        /// this instance. Null the rest of the time. This is informational only - nothing reads
+        /// it to decide to cancel or skip anything; it exists so a caller stuck on a busy error
+        /// can tell "still working" from "looks stuck" for themselves.
+        /// </summary>
+        public ResponseOperationProgress? Progress { get; set; }
+    }
+
+    public class ResponseOperationProgress
+    {
+        public string Tool { get; set; } = string.Empty;
+        public int? Total { get; set; }
+        public int Processed { get; set; }
+        public string? CurrentPath { get; set; }
+        public double ElapsedSeconds { get; set; }
+        public double LastProgressSecondsAgo { get; set; }
+        public string Summary { get; set; } = string.Empty;
     }
 
     public class ResponseTiaInstallation

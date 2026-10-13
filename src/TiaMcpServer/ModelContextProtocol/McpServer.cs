@@ -151,12 +151,13 @@ namespace TiaMcpServer.ModelContextProtocol
 
         #region state
 
-        [McpServerTool(Name = "GetState", Title = "Get server state", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Show the portalId this server is attached to, whether it is connected, the open project and session, and whether write mode (--allow-write) is enabled")]
-        public static ResponseState GetState()
+        [McpServerTool(Name = "GetState", Title = "Get server state", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Show the portalId this server is attached to, whether it is connected, the open project and session, and whether write mode (--allow-write) is enabled. Also reports 'progress' while a long-running call (e.g. FindInCode) is in flight on this instance - call this from a second request to check whether such a call looks stuck or just slow, without waiting for it to finish. Declares 'portalId' itself and never waits for a busy instance, unlike other tools")]
+        public static ResponseState GetState(
+            [Description("portalId: process id of the TIA Portal instance to report on (see 'GetPortals'). Leave empty when at most one instance is attached")] int? portalId = null)
         {
             try
             {
-                var state = Portal.GetState();
+                var state = Portal.GetState(portalId);
 
                 if (state != null)
                 {
@@ -172,6 +173,18 @@ namespace TiaMcpServer.ModelContextProtocol
                             ? null
                             : new JsonObject(ToolDefaults.Presets.Select(p =>
                                 new KeyValuePair<string, JsonNode?>(p.Key, JsonValue.Create(p.Value)))),
+                        Progress = state.Progress == null
+                            ? null
+                            : new ResponseOperationProgress
+                            {
+                                Tool = state.Progress.Tool,
+                                Total = state.Progress.Total,
+                                Processed = state.Progress.Processed,
+                                CurrentPath = state.Progress.CurrentPath,
+                                ElapsedSeconds = (DateTime.Now - state.Progress.StartedAt).TotalSeconds,
+                                LastProgressSecondsAgo = (DateTime.Now - state.Progress.LastProgressAt).TotalSeconds,
+                                Summary = state.Progress.Describe()
+                            },
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,
@@ -183,8 +196,10 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     throw new McpException("Failed to retrieve TIA-Portal MCP server state");
                 }
-                
-
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(PortalSelection.Describe(pex), pex);
             }
             catch (Exception ex) when (ex is not McpException)
             {

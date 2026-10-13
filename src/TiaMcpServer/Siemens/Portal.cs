@@ -169,10 +169,16 @@ namespace TiaMcpServer.Siemens
 
         #region status
 
-        public State GetState()
+        // Resolves the instance itself (rather than going through the call-tool filter's
+        // RunScopedAsync/Current scoping, like every other tool does) so this never waits on a
+        // busy instance's Gate - the whole point is to stay readable while another request on
+        // the same instance is still running. Reads context fields directly rather than the
+        // ambient _project/_session/IsConnected() helpers, since those rely on Current being
+        // scoped by RunScopedAsync, which this deliberately bypasses.
+        public State GetState(int? portalId = null)
         {
             _logger?.LogInformation("Getting TIA Portal state...");
-            var context = Current;
+            var context = Resolve(portalId);
 
             if (context is not null)
             {
@@ -183,9 +189,10 @@ namespace TiaMcpServer.Siemens
             return new State
             {
                 PortalId = context?.Id,
-                IsConnected = IsConnected(),
-                Project = _project != null ? _project.Name : "-",
-                Session = _session != null ? _session.Project.Name : "-"
+                IsConnected = context != null,
+                Project = context?.Project != null ? context.Project.Name : "-",
+                Session = context?.Session != null ? context.Session.Project.Name : "-",
+                Progress = context?.Progress
             };
         }
 
