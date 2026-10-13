@@ -2173,6 +2173,24 @@ Use the CreateHmiTag tool with these parameters:
 - name: {name}{OptionalParameter("dataType", dataType)}{OptionalParameter("connection", connection)}{OptionalParameter("plcTag", plcTag)}";
         }
 
+        [McpServerPrompt(Name = "CopyHmiScreen"), Description("Copy a WinCC Unified screen with text replacement")]
+        public static string CopyHmiScreen(string softwarePath, string screenName, string newScreenName, string replace = "", string screenNumber = "")
+        {
+            return $@"Copy a WinCC Unified screen to a new screen in the same folder, item by item with properties, texts, tag and script dynamizations, event scripts and faceplate interfaces. 'replace' rewrites text in every copied string, e.g. to make the screen of the next servo from the first one.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: the screen to copy
+- newScreenName: name of the new screen
+- replace: optional 'from=>to' pairs separated by ';', e.g. 'Servo01=>Servo02;SM118=>SM119'
+- screenNumber: optional screen number of the new screen
+
+Use the CopyHmiScreen tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- newScreenName: {newScreenName}{OptionalParameter("replace", replace)}{OptionalParameter("screenNumber", screenNumber)}";
+        }
+
         #endregion
 
         #region Compare Templates

@@ -4,6 +4,14 @@
 
 ### Added
 
+- __CopyHmiScreen__ (write): copies a WinCC Unified screen to a new screen in the same folder with
+  optional `replace` ('Servo01=>Servo02;...') applied to every copied string - tag names, texts, scripts,
+  faceplate interface values. V20 Openness has no Unified screen copy/export, so the copy is rebuilt item
+  by item from the generic attribute API: every read-write attribute, multilingual texts, part objects,
+  dynamizations of any type, event handler scripts and faceplate interfaces. Reads happen before the
+  write transaction (unreadable parts are reported under `skipped`); a write TIA Portal refuses aborts the
+  whole copy and names the item and attribute. Written independently from the Openness DLL.
+
 - __CompareExports__ (REQUESTS.md P7): compares two export folders by relative path and lists files only
   in one folder and changed files with the changed line range, lines added/removed and a short excerpt
   of each side. Ignores the SimaticML `<DocumentInfo>` export timestamp, line endings and trailing
