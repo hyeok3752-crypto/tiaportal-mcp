@@ -693,6 +693,20 @@ namespace TiaMcpServer.ModelContextProtocol
                     });
                 }
 
+                // REQUESTS.md P12-2: check the SimaticML files themselves for what TIA Portal rejects
+                // with no useful reason - found by bisecting a failed import on 2026-10-12.
+                foreach (var item in items)
+                {
+                    var xml = Path.Combine(importPath, item.Name + ".xml");
+
+                    if (File.Exists(xml))
+                    {
+                        var problems = CheckSimaticMl(xml);
+                        item.Problems = problems.Count > 0 ? problems : null;
+                    }
+                }
+
+                var problemFiles = items.Count(i => i.Problems != null);
                 var creates = items.Count(i => i.Effect == "create");
                 var overwrites = items.Count(i => i.Effect == "overwrite");
                 var conflicts = items.Count(i => i.Effect == "conflict" || i.Effect == "overwrite-elsewhere");
@@ -700,11 +714,14 @@ namespace TiaMcpServer.ModelContextProtocol
                 return new ResponseImportPreview
                 {
                     Message = $"Importing '{importPath}' into {target} would create {creates}, overwrite {overwrites}, " +
-                              $"and hit {conflicts} conflict(s). Nothing was changed.",
+                              $"and hit {conflicts} conflict(s)." +
+                              (problemFiles > 0 ? $" WARNING: {problemFiles} file(s) have problems TIA Portal will reject - see 'problems'." : string.Empty) +
+                              " Nothing was changed.",
                     Items = items,
                     CreateCount = creates,
                     OverwriteCount = overwrites,
                     ConflictCount = conflicts,
+                    ProblemFileCount = problemFiles,
                     Meta = Ok(new JsonObject
                     {
                         ["files"] = names.Count,
@@ -722,6 +739,68 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 throw new McpException($"Unexpected error previewing the import of '{importPath}': {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Static checks on one SimaticML file. Each rule is a real rejection seen live:
+        /// - every ID attribute must be unique in the file (a new CompileUnit reusing ID "60");
+        /// - UIds must be unique inside one network's source;
+        /// - an SCL (StructuredText) Bool literal carries ConstantValue only - a ConstantType on TRUE failed.
+        /// </summary>
+        private static List<string> CheckSimaticMl(string file)
+        {
+            var problems = new List<string>();
+            System.Xml.Linq.XDocument doc;
+
+            try
+            {
+                doc = System.Xml.Linq.XDocument.Load(file);
+            }
+            catch (Exception ex)
+            {
+                problems.Add($"Not readable as XML: {ex.Message}");
+                return problems;
+            }
+
+            foreach (var duplicate in doc.Descendants()
+                         .Select(e => e.Attribute("ID")?.Value)
+                         .Where(v => v != null)
+                         .GroupBy(v => v!, StringComparer.OrdinalIgnoreCase)
+                         .Where(g => g.Count() > 1))
+            {
+                problems.Add($"ID '{duplicate.Key}' is used {duplicate.Count()} times; IDs must be unique in the file (they are not network numbers).");
+            }
+
+            var networkNo = 0;
+
+            foreach (var source in doc.Descendants().Where(e => e.Name.LocalName == "NetworkSource"))
+            {
+                networkNo++;
+
+                foreach (var duplicate in source.Descendants()
+                             .Select(e => e.Attribute("UId")?.Value)
+                             .Where(v => v != null)
+                             .GroupBy(v => v!)
+                             .Where(g => g.Count() > 1))
+                {
+                    problems.Add($"Network {networkNo}: UId '{duplicate.Key}' is used {duplicate.Count()} times; UIds must be unique within a network.");
+                }
+
+                var scl = source.Elements().FirstOrDefault(e => e.Name.LocalName == "StructuredText");
+
+                var typedBool = scl?.Descendants()
+                    .Where(e => e.Name.LocalName == "ConstantType")
+                    .Select(e => e.Parent?.Elements().FirstOrDefault(v => v.Name.LocalName == "ConstantValue")?.Value?.Trim())
+                    .FirstOrDefault(v => string.Equals(v, "TRUE", StringComparison.OrdinalIgnoreCase)
+                                      || string.Equals(v, "FALSE", StringComparison.OrdinalIgnoreCase));
+
+                if (typedBool != null)
+                {
+                    problems.Add($"Network {networkNo}: the SCL literal {typedBool} has a <ConstantType>; an SCL Bool literal takes <ConstantValue> only (rejected live on 2026-10-12).");
+                }
+            }
+
+            return problems;
         }
 
         /// <summary>File kinds an export of this server produces, and therefore an import consumes.</summary>

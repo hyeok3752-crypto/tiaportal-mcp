@@ -4,6 +4,14 @@
 
 ### Added
 
+- __PreviewImport checks the files themselves__ (REQUESTS.md P12-2): duplicate `ID`s in a SimaticML file,
+  duplicate `UId`s within one network, and a `ConstantType` on an SCL Bool literal - the three causes of
+  silent import rejections found on 2026-10-12. Reported per item as `problems` and counted in
+  `problemFileCount` (added fields).
+- __Imports refuse library type instances up front__ (P11-4): `ImportXmlBlock`/`ImportXmlType` over a
+  block or type linked to a project library type now fail with an explanation instead of letting TIA
+  Portal open a modal "test environment of the library cannot be deleted or replaced" dialog.
+
 - __WinCC Unified faceplates__: `CreateHmiFaceplate` places a faceplate container of a library faceplate
   type on a screen; `SetHmiFaceplateInterface` sets one interface property to a static value or binds it
   to an HMI tag. `GetHmiScreenItems` now also returns `faceplateType` and `faceplateInterface` for

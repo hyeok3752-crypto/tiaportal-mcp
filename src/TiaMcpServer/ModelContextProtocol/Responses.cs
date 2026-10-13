@@ -639,6 +639,12 @@ namespace TiaMcpServer.ModelContextProtocol
         public string? ExistingPath { get; set; }
 
         public string? Note { get; set; }
+
+        /// <summary>
+        /// Problems found in the .xml file itself that make TIA Portal reject the import (duplicate
+        /// IDs, duplicate UIds in a network, known forbidden patterns). Null when none were found.
+        /// </summary>
+        public List<string>? Problems { get; set; }
     }
 
     public class ResponseImportPreview : ResponseMessage
@@ -650,6 +656,9 @@ namespace TiaMcpServer.ModelContextProtocol
         public int? OverwriteCount { get; set; }
 
         public int? ConflictCount { get; set; }
+
+        /// <summary>Number of files with problems in the file itself (see each item's Problems).</summary>
+        public int? ProblemFileCount { get; set; }
     }
 
     /// <summary>One line of source text that matched a code search.</summary>

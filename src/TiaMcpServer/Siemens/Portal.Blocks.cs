@@ -257,6 +257,8 @@ namespace TiaMcpServer.Siemens
 
                     IList<PlcBlock> list;
 
+                    RefuseLibraryTypeInstance(softwarePath, importPath);
+
                     try
                     {
                         list = group.Blocks.Import(fileInfo, ImportOptions.Override);

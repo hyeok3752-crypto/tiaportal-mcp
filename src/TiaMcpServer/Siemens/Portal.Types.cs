@@ -3,6 +3,7 @@ using Siemens.Engineering;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.Hmi;
 using Siemens.Engineering.HmiUnified;
+using Siemens.Engineering.Library.Types;
 using Siemens.Engineering.Multiuser;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks.Interface;
@@ -223,6 +224,8 @@ namespace TiaMcpServer.Siemens
                         ?? throw new PortalException(PortalErrorCode.NotFound,
                             $"Group not found at '{groupPath}'. 'GetSoftwareTree' lists the valid group paths.");
 
+                    RefuseLibraryTypeInstance(softwarePath, importPath);
+
                     IList<PlcType> list;
 
                     try
@@ -245,6 +248,88 @@ namespace TiaMcpServer.Siemens
                     return true;
                 },
                 ("softwarePath", softwarePath), ("groupPath", groupPath), ("importPath", importPath));
+        }
+
+        /// <summary>
+        /// REQUESTS.md P11-4: importing over an object that is an instance of a project library type
+        /// makes TIA Portal open a modal "The test environment of the library cannot be deleted or
+        /// replaced" dialog, which blocks Openness until someone clicks OK. Refuse up front instead,
+        /// when the file names an existing block or type that carries a library type link.
+        /// </summary>
+        private void RefuseLibraryTypeInstance(string softwarePath, string importPath)
+        {
+            var (kind, name) = ReadSimaticMlObjectName(importPath);
+
+            if (name == null || GetSoftwareContainer(softwarePath)?.Software is not PlcSoftware plc)
+            {
+                return;
+            }
+
+            IEngineeringServiceProvider? existing = kind == "type"
+                ? FindTypeAnywhere(plc.TypeGroup, name)
+                : FindBlockAnywhere(plc.BlockGroup, name);
+
+            var info = existing?.GetService<LibraryTypeInstanceInfo>();
+
+            if (info == null)
+            {
+                return;
+            }
+
+            var version = info.LibraryTypeVersion;
+            var library = version == null
+                ? "a project library type"
+                : $"library type '{version.TypeObject?.Name}' V{version.VersionNumber} ({version.State})";
+
+            throw new PortalException(PortalErrorCode.InvalidState,
+                $"'{name}' is an instance of {library}. TIA Portal does not let an import replace it (it opens a " +
+                "'test environment of the library cannot be deleted or replaced' dialog). Change it through the project " +
+                "library instead (edit the type, then release the version), or import under a different name.");
+        }
+
+        /// <summary>("type" or "block", name) of the first object in a SimaticML file; (null, null) if unreadable.</summary>
+        private static (string? Kind, string? Name) ReadSimaticMlObjectName(string importPath)
+        {
+            try
+            {
+                var doc = System.Xml.Linq.XDocument.Load(importPath);
+
+                foreach (var element in doc.Descendants())
+                {
+                    var local = element.Name.LocalName;
+                    var kind = local.StartsWith("SW.Types.", StringComparison.Ordinal) ? "type"
+                        : local.StartsWith("SW.Blocks.", StringComparison.Ordinal) && !local.StartsWith("SW.Blocks.CompileUnit", StringComparison.Ordinal) ? "block"
+                        : null;
+
+                    if (kind == null)
+                    {
+                        continue;
+                    }
+
+                    var name = element.Elements().FirstOrDefault(e => e.Name.LocalName == "AttributeList")?
+                        .Elements().FirstOrDefault(e => e.Name.LocalName == "Name")?.Value;
+
+                    return (kind, string.IsNullOrWhiteSpace(name) ? null : name);
+                }
+            }
+            catch (Exception)
+            {
+                // Not readable as XML here: let TIA Portal's own import report the problem.
+            }
+
+            return (null, null);
+        }
+
+        private static PlcType? FindTypeAnywhere(PlcTypeGroup group, string name)
+        {
+            return group.Types.Find(name)
+                ?? group.Groups.Select(g => FindTypeAnywhere(g, name)).FirstOrDefault(t => t != null);
+        }
+
+        private static global::Siemens.Engineering.SW.Blocks.PlcBlock? FindBlockAnywhere(global::Siemens.Engineering.SW.Blocks.PlcBlockGroup group, string name)
+        {
+            return group.Blocks.Find(name)
+                ?? group.Groups.Select(g => FindBlockAnywhere(g, name)).FirstOrDefault(b => b != null);
         }
 
         public (List<PlcType> Exported, List<string> Failures) ExportXmlTypes(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
