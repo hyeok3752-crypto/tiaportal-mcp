@@ -12,6 +12,12 @@
 
 ### Fixed
 
+- __Source reads fall back to XML on any document export failure__: `GetBlockSource` / `FindInCode` fell
+  back to SimaticML only for "not supported" errors. LAD blocks in a project last edited before V20
+  Update 4 fail with a SimaticSdEnabler error instead, so they were unreadable and `FindInCode` skipped
+  them. Any document export failure (or an export that produced no file) now falls back to XML;
+  `format` in the result says which was read. `FindInCode` also opens its message with a warning when
+  objects were skipped, so "0 matches" is not mistaken for "not used".
 - __`CompileSoftware` says why it could not compile__: every failure before the compile result (no
   project, unknown software path, safety login, Openness refusing the compile) came back as a bare
   "Failed compiling software 'PLC_1'". Live, this happened three times in a row with no hint. Each case now

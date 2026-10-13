@@ -307,17 +307,33 @@ namespace TiaMcpServer.Siemens
 
                 if (wantsDocument)
                 {
+                    string? reason = null;
+
                     try
                     {
-                        exportDocuments(scope.Directory);
+                        if (!exportDocuments(scope.Directory) || !HasFiles(scope.Directory))
+                        {
+                            reason = "TIA Portal reported no source document";
+                        }
                     }
-                    catch (PortalException pex) when (IsUnsupportedForDocuments(pex))
+                    catch (Exception ex) when (ex is not PortalException pex || pex.Code != PortalErrorCode.InvalidState || IsUnsupportedForDocuments(pex))
                     {
                         // TIA Portal refuses a source document for whole categories of object -
-                        // STL blocks and mixed-language blocks among them. XML always exists, so
-                        // fall back and say so in Format rather than returning nothing.
-                        _logger?.LogWarning("No source document for '{Name}', falling back to XML: {Reason}", name, pex.Message);
+                        // STL and mixed-language blocks, and (live, Mahindra CPU01) LAD blocks in
+                        // a project last edited before V20 Update 4, which fail with a
+                        // SimaticSdEnabler error rather than EngineeringNotSupportedException.
+                        // FindInCode then reported those blocks as unsearchable, or a caller got
+                        // nothing at all. XML always exists, so fall back for any export failure
+                        // and say so in Format. Only an inconsistent object (InvalidState) is
+                        // reported as is, because the XML export refuses it as well.
+                        reason = ex.Message;
+                    }
 
+                    if (reason != null)
+                    {
+                        _logger?.LogWarning("No source document for '{Name}', falling back to XML: {Reason}", name, reason);
+
+                        ClearDirectory(scope.Directory);
                         exportXml(scope.Directory);
                         used = "xml";
                     }
@@ -365,6 +381,19 @@ namespace TiaMcpServer.Siemens
                     Truncated = truncated,
                     FileNames = files.Select(f => System.IO.Path.GetFileName(f)).ToList()
                 };
+            }
+        }
+
+        private static bool HasFiles(string directory) =>
+            System.IO.Directory.Exists(directory)
+            && System.IO.Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories).Any();
+
+        /// <summary>Removes what a failed document export may have left, so the XML fallback is read alone.</summary>
+        private static void ClearDirectory(string directory)
+        {
+            foreach (var file in System.IO.Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories).ToList())
+            {
+                File.Delete(file);
             }
         }
 
