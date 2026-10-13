@@ -27,6 +27,12 @@
 
 ### Fixed
 
+- __GetCrossReferences no longer outlives the tool timeout__: the walk stops after about 40 s (or at the
+  new optional `maxReferences`) and returns what it has with `truncated: true` and a new `stoppedReason`.
+  Before, `maxDepth 3` on a large DB ran past the 60 s device timeout, the call was dropped and the
+  restarted server was no longer attached to TIA Portal. The lazy result is now also walked under the
+  Openness lock.
+
 - __HMI screen item text__: `CreateHmiScreenItem`/`UpdateHmiScreenItem` with `text` failed for every
   Button, Label and Text, because WinCC Unified stores screen texts as rich text
   (`<body><p>USE</p></body>`) and rejects a plain string. Plain text is now wrapped; text that already

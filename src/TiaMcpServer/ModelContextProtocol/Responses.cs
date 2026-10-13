@@ -200,6 +200,12 @@ namespace TiaMcpServer.ModelContextProtocol
         /// object with a higher depth rather than assuming the tree was complete.
         /// </summary>
         public bool? Truncated { get; set; }
+
+        /// <summary>
+        /// Set when the walk stopped early on the time or reference budget rather than on maxDepth:
+        /// the sources listed are complete up to that point, later ones are missing.
+        /// </summary>
+        public string? StoppedReason { get; set; }
     }
 
     #endregion
