@@ -44,52 +44,67 @@ namespace TiaMcpServer.Siemens
         {
             _logger?.LogInformation($"Compiling software by path: {softwarePath}");
 
-            if (IsProjectNull())
-            {
-                return null; // "Error, no project";
-            }
-
-            var softwareContainer = GetSoftwareContainer(softwarePath);
-
-            if (!string.IsNullOrEmpty(password))
-            {
-                var deviceItem = softwareContainer?.Parent as DeviceItem;
-
-                var admin = deviceItem?.GetService<SafetyAdministration>();
-                if (admin != null)
+            // Every failure used to come back as null, which the tool could only report as
+            // "Failed compiling 'PLC_1'" - live, three times in a row, with no hint whether the
+            // path, the safety login or Openness itself was the problem. Each case now throws
+            // with its own reason; a compile that runs and finds errors still returns its result.
+            return Operation.Run(_logger, nameof(CompileSoftware), PortalErrorCode.InvalidState,
+                () =>
                 {
-                    if (!admin.IsLoggedOnToSafetyOfflineProgram)
+                    if (IsProjectNull())
                     {
-                        SecureString secString = new NetworkCredential("", password).SecurePassword;
-                        try
+                        throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal.");
+                    }
+
+                    var softwareContainer = GetSoftwareContainer(softwarePath)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"No software found at '{softwarePath}'. 'GetProjectTree' lists the valid software paths.");
+
+                    if (!string.IsNullOrEmpty(password))
+                    {
+                        var deviceItem = softwareContainer.Parent as DeviceItem;
+
+                        var admin = deviceItem?.GetService<SafetyAdministration>();
+                        if (admin != null && !admin.IsLoggedOnToSafetyOfflineProgram)
                         {
-                            admin.LoginToSafetyOfflineProgram(secString);
-                        }
-                        catch (Exception)
-                        {
-                            return null; // "Error, login to safety offline program failed";
+                            SecureString secString = new NetworkCredential("", password).SecurePassword;
+                            try
+                            {
+                                admin.LoginToSafetyOfflineProgram(secString);
+                            }
+                            catch (Exception ex)
+                            {
+                                throw new PortalException(PortalErrorCode.InvalidParams,
+                                    $"Login to the safety offline program failed: {ex.Message}", null, ex);
+                            }
                         }
                     }
-                }
-            }
 
-            if (softwareContainer?.Software is PlcSoftware plcSoftware)
-            {
-                try
-                {
-                    ICompilable compileService = plcSoftware.GetService<ICompilable>();
+                    if (softwareContainer.Software is not PlcSoftware plcSoftware)
+                    {
+                        throw new PortalException(PortalErrorCode.NotSupported,
+                            $"'{softwarePath}' is not a PLC software ({softwareContainer.Software?.GetType().Name ?? "no software"}); only PLC software can be compiled here.");
+                    }
 
-                    CompilerResult result = compileService.Compile();
+                    var compileService = plcSoftware.GetService<ICompilable>()
+                        ?? throw new PortalException(PortalErrorCode.NotSupported,
+                            $"TIA Portal offers no compile service for '{softwarePath}'.");
 
-                    return result;
-                }
-                catch (Exception)
-                {
-                    return null; // "Error, compiling failed";
-                }
-            }
-
-            return null; // "Error";
+                    try
+                    {
+                        return compileService.Compile();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Typical live causes: a modal dialog open in the TIA Portal UI, or the
+                        // project being edited there at the same moment.
+                        throw new PortalException(PortalErrorCode.InvalidState,
+                            $"TIA Portal refused to compile '{softwarePath}': {ex.GetType().Name}: {ex.Message}" +
+                            (ex.InnerException != null ? $" ({ex.InnerException.Message})" : string.Empty) +
+                            " - check for an open dialog or a running edit in the TIA Portal window.", null, ex);
+                    }
+                },
+                ("softwarePath", softwarePath));
         }
 
         #endregion

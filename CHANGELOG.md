@@ -12,6 +12,15 @@
 
 ### Fixed
 
+- __`CompileSoftware` says why it could not compile__: every failure before the compile result (no
+  project, unknown software path, safety login, Openness refusing the compile) came back as a bare
+  "Failed compiling software 'PLC_1'". Live, this happened three times in a row with no hint. Each case now
+  returns its own reason, including TIA's exception text; a compile that runs and finds errors still
+  returns the full message list.
+- __`ImportXmlBlock` / `ImportXmlType` pass on TIA's rejection reason__: import failures were swallowed
+  into "Failed importing block". Live, a servo FB whose network had 900+ elements was rejected and the
+  reason was never shown. The error now carries the whole exception chain from the import, and names a
+  missing file, software path or group separately.
 - __Block and type names with `[ ]` resolve without escaping__: `GetBlock`/`GetType` (and with them
   `GetBlockSource`, `GetTypeSource`, exports and `FindInCode`) treated any name containing a regex
   character as a regex, so `5_G2U1_Home[0]` looked for `5_G2U1_Home0` and was "not found" unless written

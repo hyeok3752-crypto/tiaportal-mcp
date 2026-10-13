@@ -226,47 +226,56 @@ namespace TiaMcpServer.Siemens
         {
             _logger?.LogInformation($"Importing block from path: {importPath}");
 
-            if (IsProjectNull())
-            {
-                return false;
-            }
-
-            var softwareContainer = GetSoftwareContainer(softwarePath);
-            if (softwareContainer?.Software is PlcSoftware plcSoftware)
-            {
-                var blockGroup = plcSoftware?.BlockGroup;
-
-                if (blockGroup != null)
+            // This used to swallow every failure into 'false', so the tool could only say
+            // "Failed importing" - live, a servo FB with 900+ elements in one network was
+            // rejected by TIA and the reason never reached the caller. Each failure now throws
+            // with its own reason, including TIA's message from the import itself.
+            return Operation.Run(_logger, nameof(ImportXmlBlock), PortalErrorCode.ImportFailed,
+                () =>
                 {
-
-                    var group = GetPlcBlockGroupByPath(softwarePath, groupPath);
-                    if (group == null)
+                    if (IsProjectNull())
                     {
-                        return false;
+                        throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal.");
                     }
+
+                    var fileInfo = new FileInfo(importPath);
+
+                    if (!fileInfo.Exists)
+                    {
+                        throw new PortalException(PortalErrorCode.NotFound, $"Import file not found: '{importPath}'.");
+                    }
+
+                    if (GetSoftwareContainer(softwarePath)?.Software is not PlcSoftware)
+                    {
+                        throw new PortalException(PortalErrorCode.NotFound,
+                            $"No PLC software found at '{softwarePath}'. 'GetProjectTree' lists the valid software paths.");
+                    }
+
+                    var group = GetPlcBlockGroupByPath(softwarePath, groupPath)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"Group not found at '{groupPath}'. 'GetSoftwareTree' lists the valid group paths.");
+
+                    IList<PlcBlock> list;
 
                     try
                     {
-                        // Correct the argument type by using FileInfo instead of FileStream  
-                        var fileInfo = new FileInfo(importPath);
-                        if (fileInfo.Exists)
-                        {
-                            var list = group.Blocks.Import(fileInfo, ImportOptions.Override);
-                            if (list != null && list.Count > 0)
-                            {
-                                return true;
-                            }
-                        }
-
+                        list = group.Blocks.Import(fileInfo, ImportOptions.Override);
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
-                        return false;
+                        throw new PortalException(PortalErrorCode.ImportFailed,
+                            $"TIA Portal rejected the block import from '{importPath}': {Operation.DescribeChain(ex)}", null, ex);
                     }
-                }
-            }
 
-            return false;
+                    if (list == null || list.Count == 0)
+                    {
+                        throw new PortalException(PortalErrorCode.ImportFailed,
+                            $"TIA Portal imported nothing from '{importPath}' and gave no reason. Check that the file is a SimaticML block export.");
+                    }
+
+                    return true;
+                },
+                ("softwarePath", softwarePath), ("groupPath", groupPath), ("importPath", importPath));
         }
 
         public (List<PlcBlock> Exported, List<string> Failures) ExportXmlBlocks(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)

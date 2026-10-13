@@ -145,6 +145,28 @@ namespace TiaMcpServer.Siemens
         }
 
         /// <summary>
+        /// Every distinct message down the InnerException chain, joined. Openness wraps the
+        /// actual reason for a refused import or compile one or two levels deep, so the outer
+        /// message alone ("Error when calling method 'Import'") says nothing.
+        /// </summary>
+        internal static string DescribeChain(Exception ex)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+
+            for (Exception? e = ex; e != null; e = e.InnerException)
+            {
+                var text = $"{e.GetType().Name}: {e.Message}".Trim();
+
+                if (!parts.Contains(text))
+                {
+                    parts.Add(text);
+                }
+            }
+
+            return string.Join(" -> ", parts);
+        }
+
+        /// <summary>
         /// Every export/output-path parameter in this codebase must pass through this check
         /// before being combined into a file path. A relative path resolves against the server
         /// process's current working directory, which the caller does not control and which may
