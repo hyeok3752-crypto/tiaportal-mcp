@@ -40,7 +40,7 @@ namespace TiaMcpServer.Siemens
                     {
                         var device = GetDevice(devicePath)
                             ?? throw new PortalException(PortalErrorCode.NotFound, $"Device not found at '{devicePath}'");
-                        var fileName = Path.Combine(exportPath, $"{device.Name}.aml");
+                        var fileName = Path.Combine(exportPath, $"{FileNames.Safe(device.Name)}.aml");
                         result = caxProvider.Export(device, new FileInfo(fileName));
                     }
 

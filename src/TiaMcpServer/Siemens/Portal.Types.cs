@@ -161,11 +161,11 @@ namespace TiaMcpServer.Siemens
                         groupPath = GetPlcTypeGroupPath(parentGroup);
                     }
 
-                    exportPath = Path.Combine(exportPath, groupPath.Replace('/', '\\'), $"{type.Name}.xml");
+                    exportPath = Path.Combine(exportPath, FileNames.SafeRelative(groupPath), $"{FileNames.Safe(type.Name)}.xml");
                 }
                 else
                 {
-                    exportPath = Path.Combine(exportPath, $"{type.Name}.xml");
+                    exportPath = Path.Combine(exportPath, $"{FileNames.Safe(type.Name)}.xml");
                 }
 
                 if (File.Exists(exportPath))
@@ -287,11 +287,11 @@ namespace TiaMcpServer.Siemens
                     {
                         groupPath = GetPlcTypeGroupPath(parentGroup);
                     }
-                    path = Path.Combine(exportPath, groupPath.Replace('/', '\\'), $"{type.Name}.xml");
+                    path = Path.Combine(exportPath, FileNames.SafeRelative(groupPath), $"{FileNames.Safe(type.Name)}.xml");
                 }
                 else
                 {
-                    path = Path.Combine(exportPath, $"{type.Name}.xml");
+                    path = Path.Combine(exportPath, $"{FileNames.Safe(type.Name)}.xml");
                 }
 
                 try

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading;
 
 namespace TiaMcpServer.Siemens
@@ -183,6 +184,45 @@ namespace TiaMcpServer.Siemens
                 throw new PortalException(PortalErrorCode.InvalidParams,
                     $"{paramName} must be an absolute path - relative paths resolve against the server process's working directory, which may not be writable. Got: '{path}'");
             }
+        }
+    }
+
+    /// <summary>
+    /// TIA Portal allows object names that are not valid Windows file names - the CPU01 project has
+    /// blocks named 'T_Data->HMI' and 'GTS_EQ_I/FLower' - so every export that turns a name into a
+    /// file or folder name goes through here. Lookups by name still use the real name.
+    /// </summary>
+    internal static class FileNames
+    {
+        private static readonly char[] Invalid = System.IO.Path.GetInvalidFileNameChars();
+
+        /// <summary>The name with every character Windows does not allow in a file name replaced by '_'.</summary>
+        internal static string Safe(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name.IndexOfAny(Invalid) < 0)
+            {
+                return name;
+            }
+
+            var chars = name.ToCharArray();
+
+            for (var i = 0; i < chars.Length; i++)
+            {
+                if (Array.IndexOf(Invalid, chars[i]) >= 0)
+                {
+                    chars[i] = '_';
+                }
+            }
+
+            return new string(chars);
+        }
+
+        /// <summary>A '/'-separated group path as a relative Windows folder path, each segment made safe.</summary>
+        internal static string SafeRelative(string groupPath)
+        {
+            return string.Join("\\", (groupPath ?? string.Empty)
+                .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(Safe));
         }
     }
 }

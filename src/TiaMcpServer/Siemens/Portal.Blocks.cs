@@ -186,11 +186,11 @@ namespace TiaMcpServer.Siemens
                         groupPath = GetPlcBlockGroupPath(parentGroup);
                     }
 
-                    exportPath = Path.Combine(exportPath, groupPath.Replace('/', '\\'), $"{block.Name}.xml");
+                    exportPath = Path.Combine(exportPath, FileNames.SafeRelative(groupPath), $"{FileNames.Safe(block.Name)}.xml");
                 }
                 else
                 {
-                    exportPath = Path.Combine(exportPath, $"{block.Name}.xml");
+                    exportPath = Path.Combine(exportPath, $"{FileNames.Safe(block.Name)}.xml");
                 }
 
                 // TIA Portal never exports inconsistent blocks
@@ -319,11 +319,11 @@ namespace TiaMcpServer.Siemens
                     {
                         groupPath = GetPlcBlockGroupPath(parentGroup);
                     }
-                    path = Path.Combine(exportPath, groupPath.Replace('/', '\\'), $"{block.Name}.xml");
+                    path = Path.Combine(exportPath, FileNames.SafeRelative(groupPath), $"{FileNames.Safe(block.Name)}.xml");
                 }
                 else
                 {
-                    path = Path.Combine(exportPath, $"{block.Name}.xml");
+                    path = Path.Combine(exportPath, $"{FileNames.Safe(block.Name)}.xml");
                 }
 
                 try

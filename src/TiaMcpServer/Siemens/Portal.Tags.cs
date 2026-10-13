@@ -159,8 +159,8 @@ namespace TiaMcpServer.Siemens
                             $"Tag table not found at '{tagTablePath}'. Use 'GetTagTables' to list the available tables.");
 
                     var target = preservePath
-                        ? Path.Combine(exportPath, GetTagTablePath(table, includeSystemRoot: true).Replace('/', '\\') + ".xml")
-                        : Path.Combine(exportPath, $"{table.Name}.xml");
+                        ? Path.Combine(exportPath, FileNames.SafeRelative(GetTagTablePath(table, includeSystemRoot: true)) + ".xml")
+                        : Path.Combine(exportPath, $"{FileNames.Safe(table.Name)}.xml");
 
                     var directory = Path.GetDirectoryName(target);
                     if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -421,8 +421,8 @@ namespace TiaMcpServer.Siemens
                             $"Watch table not found at '{watchTablePath}'. Use 'GetWatchTables' to list the available tables.");
 
                     var target = preservePath
-                        ? Path.Combine(exportPath, GetWatchTablePath(table).Replace('/', '\\') + ".xml")
-                        : Path.Combine(exportPath, $"{table.Name}.xml");
+                        ? Path.Combine(exportPath, FileNames.SafeRelative(GetWatchTablePath(table)) + ".xml")
+                        : Path.Combine(exportPath, $"{FileNames.Safe(table.Name)}.xml");
 
                     var directory = Path.GetDirectoryName(target);
                     if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))

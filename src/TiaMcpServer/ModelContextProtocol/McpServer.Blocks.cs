@@ -65,7 +65,7 @@ namespace TiaMcpServer.ModelContextProtocol
         [McpServerTool(Name = "GetBlocks", Title = "Get blocks", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("List the program blocks of a PLC software, optionally filtered by a name or regular expression")]
         public static ResponseBlocks GetBlocks(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
-            [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "",
+            [Description("regexName: defines the name or regular expression to find the block, matched anywhere in the block name ('G3U' also matches G3U10..G3U12; anchor with ^...$ for an exact name). Use empty string (default) to find all")] string regexName = "",
             [Description("includeAttributes: return every Openness attribute of each block (about 30 each). Default true. Pass false on a large PLC when only names and paths are needed - reading the attributes is most of this tool's run time")] bool includeAttributes = true)
         {
             try
@@ -330,8 +330,9 @@ namespace TiaMcpServer.ModelContextProtocol
             IProgress<ProgressNotificationValue> progress,
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("exportPath: defines the path where to export the blocks")] string exportPath,
-            [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "",
-            [Description("preservePath: preserves the path/structure of the PLC software")] bool preservePath = false)
+            [Description("regexName: defines the name or regular expression to find the block, matched anywhere in the block name ('G3U' also matches G3U10..G3U12; anchor with ^...$ for an exact name). Use empty string (default) to find all")] string regexName = "",
+            [Description("preservePath: preserves the path/structure of the PLC software")] bool preservePath = false,
+            [Description("includeAttributes: return every Openness attribute of each exported object (about 30 each). Default true. Pass false for a large export - the files are written either way, and the attribute lists can exceed the reply size")] bool includeAttributes = true)
         {
             var startTime = DateTime.Now;
             
@@ -376,7 +377,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     {
                         if (b != null && b.IsConsistent == false)
                         {
-                            var attrs = Helper.GetAttributeList(b);
+                            var attrs = includeAttributes ? Helper.GetAttributeList(b) : null;
                             inconsistentInfos.Add(new ResponseBlockInfo
                             {
                                 Path = Portal.GetBlockPath(b),
@@ -406,7 +407,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     if (block != null)
                     {
-                        var attributes = Helper.GetAttributeList(block);
+                        var attributes = includeAttributes ? Helper.GetAttributeList(block) : null;
 
                         responseList.Add(new ResponseBlockInfo
                         {

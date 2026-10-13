@@ -27,6 +27,14 @@
 
 ### Fixed
 
+- __Exports of objects whose names are not valid file names__: TIA Portal allows names such as
+  `T_Data->HMI` or `GTS_EQ_I/FLower`; every export, `GetBlockSource`/`GetTypeSource`, `FindInCode` and
+  `ExportXmlBlocks` with a broad regex failed with "Illegal characters in path" on them (REQUESTS.md
+  P12-3). File and folder names now replace such characters with `_`; lookups keep the real name.
+- __ExportXmlBlocks/ExportXmlTypes reply size__ (P12-3): new `includeAttributes` (default true, unchanged)
+  to leave out the per-object attribute lists that made a 226-block reply exceed the token limit. The
+  `regexName` description now says the pattern matches anywhere in the name ('G3U' also matches G3U10).
+
 - __GetCrossReferences no longer outlives the tool timeout__: the walk stops after about 40 s (or at the
   new optional `maxReferences`) and returns what it has with `truncated: true` and a new `stoppedReason`.
   Before, `maxDepth 3` on a large DB ran past the 60 s device timeout, the call was dropped and the

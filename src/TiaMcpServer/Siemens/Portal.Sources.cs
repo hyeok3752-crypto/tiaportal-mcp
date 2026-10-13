@@ -92,7 +92,7 @@ namespace TiaMcpServer.Siemens
 
                     try
                     {
-                        var result = block.ExportAsDocuments(new DirectoryInfo(dir), name);
+                        var result = block.ExportAsDocuments(new DirectoryInfo(dir), FileNames.Safe(name));
 
                         return result != null && result.State == DocumentResultState.Success;
                     }
@@ -104,7 +104,7 @@ namespace TiaMcpServer.Siemens
                 },
                 dir =>
                 {
-                    block.Export(new FileInfo(Path.Combine(dir, $"{name}.xml")), ExportOptions.None);
+                    block.Export(new FileInfo(Path.Combine(dir, $"{FileNames.Safe(name)}.xml")), ExportOptions.None);
 
                     return true;
                 });
@@ -152,7 +152,7 @@ namespace TiaMcpServer.Siemens
                 },
                 dir =>
                 {
-                    type.Export(new FileInfo(Path.Combine(dir, $"{name}.xml")), ExportOptions.None);
+                    type.Export(new FileInfo(Path.Combine(dir, $"{FileNames.Safe(name)}.xml")), ExportOptions.None);
 
                     return true;
                 });
@@ -186,7 +186,7 @@ namespace TiaMcpServer.Siemens
                     }
 
                     using var scope = new SourceScope(_logger);
-                    var exportPath = Path.Combine(scope.Directory, $"{block.Name}.xml");
+                    var exportPath = Path.Combine(scope.Directory, $"{FileNames.Safe(block.Name)}.xml");
                     block.Export(new FileInfo(exportPath), ExportOptions.None);
 
                     var doc = XDocument.Load(exportPath);
@@ -998,7 +998,7 @@ namespace TiaMcpServer.Siemens
 
             return string.IsNullOrEmpty(groupPath)
                 ? exportPath
-                : Path.Combine(exportPath, groupPath.Replace('/', '\\'));
+                : Path.Combine(exportPath, FileNames.SafeRelative(groupPath));
         }
 
         /// <summary>Flat, or the project tree below the 'PLC data types' system folder.</summary>
@@ -1013,7 +1013,7 @@ namespace TiaMcpServer.Siemens
 
             return string.IsNullOrEmpty(groupPath)
                 ? exportPath
-                : Path.Combine(exportPath, groupPath.Replace('/', '\\'));
+                : Path.Combine(exportPath, FileNames.SafeRelative(groupPath));
         }
 
         #endregion

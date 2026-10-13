@@ -352,7 +352,7 @@ namespace TiaMcpServer.Siemens
         {
             try
             {
-                return type.ExportAsDocuments(new DirectoryInfo(directory), type.Name);
+                return type.ExportAsDocuments(new DirectoryInfo(directory), FileNames.Safe(type.Name));
             }
             catch (EngineeringNotSupportedException ex)
             {
@@ -377,7 +377,7 @@ namespace TiaMcpServer.Siemens
 
             return string.IsNullOrEmpty(groupPath)
                 ? exportPath
-                : Path.Combine(exportPath, groupPath.Replace('/', '\\'));
+                : Path.Combine(exportPath, FileNames.SafeRelative(groupPath));
         }
 
         #endregion
@@ -628,18 +628,18 @@ namespace TiaMcpServer.Siemens
                         try
                         {
                             // delete files s7dcl/s7res if already exists
-                            var blockFiles7dclPath = Path.Combine(exportPath, $"{blockName}.s7dcl");
+                            var blockFiles7dclPath = Path.Combine(exportPath, $"{FileNames.Safe(blockName)}.s7dcl");
                             if (File.Exists(blockFiles7dclPath))
                             {
                                 File.Delete(blockFiles7dclPath);
                             }
-                            var blockFiles7resPath = Path.Combine(exportPath, $"{blockName}.s7res");
+                            var blockFiles7resPath = Path.Combine(exportPath, $"{FileNames.Safe(blockName)}.s7res");
                             if (File.Exists(blockFiles7resPath))
                             {
                                 File.Delete(blockFiles7resPath);
                             }
 
-                            var result = group?.Blocks.Find(blockName)?.ExportAsDocuments(new DirectoryInfo(exportPath), blockName);
+                            var result = group?.Blocks.Find(blockName)?.ExportAsDocuments(new DirectoryInfo(exportPath), FileNames.Safe(blockName));
 
                             if (result != null && result.State == DocumentResultState.Success)
                             {
@@ -727,7 +727,7 @@ namespace TiaMcpServer.Siemens
                     var groupPath = GetPlcBlockGroupPath(parentGroup);
                     if (!string.IsNullOrWhiteSpace(groupPath))
                     {
-                        targetDir = Path.Combine(exportPath, groupPath.Replace('/', '\\'));
+                        targetDir = Path.Combine(exportPath, FileNames.SafeRelative(groupPath));
                     }
                 }
 
@@ -745,8 +745,8 @@ namespace TiaMcpServer.Siemens
                     continue;
                 }
 
-                var fileDcl = Path.Combine(targetDir, $"{block.Name}.s7dcl");
-                var fileRes = Path.Combine(targetDir, $"{block.Name}.s7res");
+                var fileDcl = Path.Combine(targetDir, $"{FileNames.Safe(block.Name)}.s7dcl");
+                var fileRes = Path.Combine(targetDir, $"{FileNames.Safe(block.Name)}.s7res");
 
                 // Clean previous artifacts
                 foreach (var f in new[] { fileDcl, fileRes })
@@ -771,7 +771,7 @@ namespace TiaMcpServer.Siemens
                     DocumentExportResult? result = null;
                     try
                     {
-                        result = block.ExportAsDocuments(new DirectoryInfo(targetDir), block.Name);
+                        result = block.ExportAsDocuments(new DirectoryInfo(targetDir), FileNames.Safe(block.Name));
                     }
                     catch (EngineeringNotSupportedException ex)
                     {

@@ -60,7 +60,7 @@ namespace TiaMcpServer.ModelContextProtocol
         [McpServerTool(Name = "GetTypes", Title = "Get types", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("List the PLC data types of a PLC software, optionally filtered by a name or regular expression")]
         public static ResponseTypes GetTypes(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
-            [Description("regexName: defines the name or regular expression to find the type. Use empty string (default) to find all")] string regexName = "",
+            [Description("regexName: defines the name or regular expression to find the type, matched anywhere in the type name; anchor with ^...$ for an exact name. Use empty string (default) to find all")] string regexName = "",
             [Description("includeAttributes: return every Openness attribute of each type (about 30 each). Default true. Pass false on a large PLC when only names and paths are needed - reading the attributes is most of this tool's run time")] bool includeAttributes = true)
         {
             try
@@ -203,8 +203,9 @@ namespace TiaMcpServer.ModelContextProtocol
             IProgress<ProgressNotificationValue> progress,
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("exportPath: defines the path where to export the types")] string exportPath,
-            [Description("regexName: defines the name or regular expression to find the type. Use empty string (default) to find all")] string regexName = "",
-            [Description("preservePath: preserves the path/structure of the PLC software")] bool preservePath = false)
+            [Description("regexName: defines the name or regular expression to find the type, matched anywhere in the type name; anchor with ^...$ for an exact name. Use empty string (default) to find all")] string regexName = "",
+            [Description("preservePath: preserves the path/structure of the PLC software")] bool preservePath = false,
+            [Description("includeAttributes: return every Openness attribute of each exported object (about 30 each). Default true. Pass false for a large export - the files are written either way, and the attribute lists can exceed the reply size")] bool includeAttributes = true)
         {
             var startTime = DateTime.Now;
             
@@ -249,7 +250,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     {
                         if (t != null && t.IsConsistent == false)
                         {
-                            var attrs = Helper.GetAttributeList(t);
+                            var attrs = includeAttributes ? Helper.GetAttributeList(t) : null;
                             inconsistentTypeInfos.Add(new ResponseTypeInfo
                             {
                                 Path = Portal.GetTypePath(t),
@@ -276,7 +277,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     if (type != null)
                     {
-                        var attributes = Helper.GetAttributeList(type);
+                        var attributes = includeAttributes ? Helper.GetAttributeList(type) : null;
 
                         responseList.Add(new ResponseTypeInfo
                         {
