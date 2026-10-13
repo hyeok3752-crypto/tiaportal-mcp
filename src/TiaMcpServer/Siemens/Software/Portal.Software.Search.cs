@@ -80,30 +80,62 @@ namespace TiaMcpServer.Siemens
 
                     var result = new CodeSearchResult { Pattern = pattern };
 
-                    // Blocks and types are read through the same readers the source tools use, so
-                    // a hit always corresponds to text the caller can fetch with GetBlockSource.
-                    var targets = new List<(string Path, bool IsBlock)>();
-
-                    targets.AddRange(GetBlocks(softwarePath, nameFilter)
-                        .Where(b => b.IsConsistent)
-                        .Select(b => (GetBlockPath(b), true)));
-
-                    targets.AddRange(GetTypes(softwarePath, nameFilter)
-                        .Where(t => t.IsConsistent)
-                        .Select(t => (GetTypePath(t), false)));
-
-                    result.ObjectsSearched = targets.Count;
-
-                    // Each target is exported individually, so a big, unfiltered PLC can take
-                    // minutes - 'GetState' reports this while it runs so a caller stuck on a
-                    // busy error can tell "still working" from "looks stuck".
-                    BeginProgress(nameof(FindInCode), targets.Count);
+                    // Listing the candidates is itself a long walk on a big PLC (every block name
+                    // is read, filtered or not), so report it too - otherwise GetState shows
+                    // nothing for the first part of the call.
+                    BeginProgress(nameof(FindInCode), null);
 
                     try
                     {
-                        for (var t = 0; t < targets.Count; t++)
+                        // Blocks and types are read through the same readers the source tools use, so
+                        // a hit always corresponds to text the caller can fetch with GetBlockSource.
+                        // The objects are kept rather than just their paths: re-resolving each path
+                        // walked the device list and group tree again for every single object.
+                        var targets = new List<(string Path, PlcBlock? Block, PlcType? Type)>();
+
+                        ReportProgress(0, "(listing blocks)");
+
+                        foreach (var block in GetBlocks(softwarePath, nameFilter))
                         {
-                            var target = targets[t];
+                            targets.Add((GetBlockPath(block), block, null));
+                        }
+
+                        ReportProgress(0, "(listing PLC data types)");
+
+                        foreach (var type in GetTypes(softwarePath, nameFilter))
+                        {
+                            targets.Add((GetTypePath(type), null, type));
+                        }
+
+                        // Inconsistent objects cannot be exported. They used to be dropped without a
+                        // word, so a search over a block that was just edited and not yet compiled
+                        // reported "0 objects searched" instead of saying why.
+                        var readable = new List<(string Path, PlcBlock? Block, PlcType? Type)>();
+
+                        foreach (var target in targets)
+                        {
+                            var consistent = target.Block?.IsConsistent ?? target.Type!.IsConsistent;
+
+                            if (consistent)
+                            {
+                                readable.Add(target);
+                            }
+                            else
+                            {
+                                result.Unsearchable.Add($"{target.Path}: inconsistent - compile the software first.");
+                            }
+                        }
+
+                        result.ObjectsSearched = readable.Count;
+
+                        // Each target is exported individually, so a big, unfiltered PLC can take
+                        // minutes - 'GetState' reports this while it runs so a caller stuck on a
+                        // busy error can tell "still working" from "looks stuck".
+                        SetProgressTotal(readable.Count);
+
+                        for (var t = 0; t < readable.Count; t++)
+                        {
+                            var target = readable[t];
 
                             if (result.Items.Count >= maxResults)
                             {
@@ -118,9 +150,9 @@ namespace TiaMcpServer.Siemens
 
                             try
                             {
-                                source = target.IsBlock
-                                    ? GetBlockSource(softwarePath, target.Path, "document", int.MaxValue)
-                                    : GetTypeSource(softwarePath, target.Path, "document", int.MaxValue);
+                                source = target.Block != null
+                                    ? ReadBlockSource(target.Block, target.Path, "document", int.MaxValue)
+                                    : ReadTypeSource(target.Type!, target.Path, "document", int.MaxValue);
                             }
                             catch (Exception ex)
                             {

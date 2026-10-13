@@ -39,6 +39,10 @@ namespace TiaMcpServer.Siemens
         internal OperationProgress WithProgress(int processed, string? currentPath, DateTime now) =>
             new OperationProgress(Tool, StartedAt, Total, processed, currentPath ?? CurrentPath, now);
 
+        /// <summary>Same run, now sized - for tools that first list their work, then process it.</summary>
+        internal OperationProgress WithTotal(int? total, DateTime now) =>
+            new OperationProgress(Tool, StartedAt, total, 0, null, now);
+
         public string Describe()
         {
             var countPart = Total is int total ? $"{Processed}/{total}" : Processed.ToString();

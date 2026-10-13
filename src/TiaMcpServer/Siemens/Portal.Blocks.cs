@@ -44,6 +44,18 @@ namespace TiaMcpServer.Siemens
                     var group = GetPlcBlockGroupByPath(softwarePath, path);
                     if (group is not null)
                     {
+                        // An exact name wins over the regex reading. Names like '5_G2U1_Home[0]'
+                        // contain regex characters, and as a regex '[0]' means "the character 0",
+                        // so the paths GetBlocks itself returns could not be resolved without
+                        // escaping. Find is also a single Openness call instead of reading every
+                        // block name in the group.
+                        block = group.Blocks.Find(regexName);
+
+                        if (block is not null)
+                        {
+                            return block;
+                        }
+
                         if (regexName.IndexOfAny(_regexChars) >= 0)
                         {
                             try

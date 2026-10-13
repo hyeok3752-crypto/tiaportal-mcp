@@ -118,6 +118,23 @@ namespace TiaMcpServer.Siemens
             context.SetProgress(existing.WithProgress(processed, currentPath, DateTime.Now));
         }
 
+        /// <summary>
+        /// Sets the total once a tool knows it, keeping the start time of the run begun with
+        /// <see cref="BeginProgress"/> and resetting the processed count to zero.
+        /// </summary>
+        internal void SetProgressTotal(int? total)
+        {
+            var context = Current;
+            var existing = context?.Progress;
+
+            if (context == null || existing == null)
+            {
+                return;
+            }
+
+            context.SetProgress(existing.WithTotal(total, DateTime.Now));
+        }
+
         /// <summary>Clears the progress started by <see cref="BeginProgress"/>.</summary>
         internal void EndProgress()
         {

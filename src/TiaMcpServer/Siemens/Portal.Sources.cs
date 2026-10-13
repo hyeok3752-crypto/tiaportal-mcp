@@ -39,20 +39,7 @@ namespace TiaMcpServer.Siemens
                         ?? throw new PortalException(PortalErrorCode.NotFound,
                             $"Block not found at '{blockPath}'. Use 'ResolveObjectPath' or 'GetBlocks' to find its path.");
 
-                    if (!block.IsConsistent)
-                    {
-                        throw new PortalException(PortalErrorCode.InvalidState,
-                            $"Block '{block.Name}' is inconsistent; TIA Portal cannot export it. Compile the software first, " +
-                            "or use 'GetBlockInterface', which works without an export.");
-                    }
-
-                    return ReadSource(
-                        format,
-                        blockPath,
-                        block.Name,
-                        maxChars,
-                        dir => ExportAsDocuments(softwarePath, blockPath, dir),
-                        dir => ExportXmlBlock(softwarePath, blockPath, dir) is not null);
+                    return ReadBlockSource(block, blockPath, format, maxChars);
                 },
                 ("softwarePath", softwarePath), ("blockPath", blockPath), ("format", format));
         }
@@ -67,21 +54,108 @@ namespace TiaMcpServer.Siemens
                         ?? throw new PortalException(PortalErrorCode.NotFound,
                             $"PLC data type not found at '{typePath}'. Use 'ResolveObjectPath' or 'GetTypes' to find its path.");
 
-                    if (!type.IsConsistent)
-                    {
-                        throw new PortalException(PortalErrorCode.InvalidState,
-                            $"PLC data type '{type.Name}' is inconsistent; compile the software before reading its source.");
-                    }
-
-                    return ReadSource(
-                        format,
-                        typePath,
-                        type.Name,
-                        maxChars,
-                        dir => ExportTypeAsDocuments(softwarePath, typePath, dir).Files.Count > 0,
-                        dir => ExportXmlType(softwarePath, typePath, dir) is not null);
+                    return ReadTypeSource(type, typePath, format, maxChars);
                 },
                 ("softwarePath", softwarePath), ("typePath", typePath), ("format", format));
+        }
+
+        /// <summary>
+        /// Source text of a block that is already resolved. GetBlockSource used to hand the path
+        /// on to ExportAsDocuments/ExportXmlBlock, which resolved it again - up to three walks
+        /// of the device list and group tree per block. FindInCode reads hundreds of blocks in
+        /// one call, so it goes through here with the objects GetBlocks already returned.
+        /// </summary>
+        private SourceTextResult ReadBlockSource(PlcBlock block, string blockPath, string format, int maxChars)
+        {
+            if (!block.IsConsistent)
+            {
+                throw new PortalException(PortalErrorCode.InvalidState,
+                    $"Block '{block.Name}' is inconsistent; TIA Portal cannot export it. Compile the software first, " +
+                    "or use 'GetBlockInterface', which works without an export.");
+            }
+
+            var name = block.Name;
+
+            return ReadSource(
+                format,
+                blockPath,
+                name,
+                maxChars,
+                dir =>
+                {
+                    if (Engineering.TiaMajorVersion < 20)
+                    {
+                        // NotSupported, not InvalidState, so ReadSource falls back to XML.
+                        throw new PortalException(PortalErrorCode.NotSupported,
+                            $"Source documents need TIA Portal V20 or newer; V{Engineering.TiaMajorVersion} is configured.");
+                    }
+
+                    try
+                    {
+                        var result = block.ExportAsDocuments(new DirectoryInfo(dir), name);
+
+                        return result != null && result.State == DocumentResultState.Success;
+                    }
+                    catch (EngineeringNotSupportedException ex)
+                    {
+                        // Mixed-language blocks among others; IsUnsupportedForDocuments finds the inner exception.
+                        throw new PortalException(PortalErrorCode.ExportFailed, $"EngineeringNotSupportedException at block '{name}'. {ex.Message}", null, ex);
+                    }
+                },
+                dir =>
+                {
+                    block.Export(new FileInfo(Path.Combine(dir, $"{name}.xml")), ExportOptions.None);
+
+                    return true;
+                });
+        }
+
+        /// <summary>The PLC data type counterpart of <see cref="ReadBlockSource"/>.</summary>
+        private SourceTextResult ReadTypeSource(PlcType type, string typePath, string format, int maxChars)
+        {
+            if (!type.IsConsistent)
+            {
+                throw new PortalException(PortalErrorCode.InvalidState,
+                    $"PLC data type '{type.Name}' is inconsistent; compile the software before reading its source.");
+            }
+
+            var name = type.Name;
+
+            return ReadSource(
+                format,
+                typePath,
+                name,
+                maxChars,
+                dir =>
+                {
+                    if (Engineering.TiaMajorVersion < MinVersionForTypeDocuments)
+                    {
+                        // Type documents are V21+. Previously this surfaced as InvalidState, which
+                        // ReadSource does not fall back on, so on V20 every type failed to read
+                        // and FindInCode listed them all as unsearchable.
+                        throw new PortalException(PortalErrorCode.NotSupported,
+                            $"Source documents for PLC data types need TIA Portal V{MinVersionForTypeDocuments}; V{Engineering.TiaMajorVersion} is configured.");
+                    }
+
+                    var result = ExportOneType(type, dir);
+
+                    if (result == null || result.State == DocumentResultState.Failure)
+                    {
+                        var info = Describe(result, dir, name);
+
+                        throw new PortalException(PortalErrorCode.ExportFailed,
+                            $"TIA Portal reported '{info.State}' exporting '{name}' as documents. " +
+                            (info.Messages.Count > 0 ? string.Join("; ", info.Messages) : "No further detail was returned."));
+                    }
+
+                    return true;
+                },
+                dir =>
+                {
+                    type.Export(new FileInfo(Path.Combine(dir, $"{name}.xml")), ExportOptions.None);
+
+                    return true;
+                });
         }
 
         /// <summary>

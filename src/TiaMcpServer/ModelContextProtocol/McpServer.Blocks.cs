@@ -65,7 +65,8 @@ namespace TiaMcpServer.ModelContextProtocol
         [McpServerTool(Name = "GetBlocks", Title = "Get blocks", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("List the program blocks of a PLC software, optionally filtered by a name or regular expression")]
         public static ResponseBlocks GetBlocks(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
-            [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "")
+            [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "",
+            [Description("includeAttributes: also return every Openness attribute of each block (about 30 each). Off by default - reading them is most of this tool's run time on a large PLC; 'GetBlockInfo' returns them for one block")] bool includeAttributes = false)
         {
             try
             {
@@ -76,7 +77,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     if (block != null)
                     {
-                        var attributes = Helper.GetAttributeList(block);
+                        var attributes = includeAttributes ? Helper.GetAttributeList(block) : null;
 
                         responseList.Add(new ResponseBlockInfo
                         {

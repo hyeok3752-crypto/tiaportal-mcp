@@ -60,7 +60,8 @@ namespace TiaMcpServer.ModelContextProtocol
         [McpServerTool(Name = "GetTypes", Title = "Get types", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("List the PLC data types of a PLC software, optionally filtered by a name or regular expression")]
         public static ResponseTypes GetTypes(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
-            [Description("regexName: defines the name or regular expression to find the type. Use empty string (default) to find all")] string regexName = "")
+            [Description("regexName: defines the name or regular expression to find the type. Use empty string (default) to find all")] string regexName = "",
+            [Description("includeAttributes: also return every Openness attribute of each type (about 30 each). Off by default - reading them is most of this tool's run time on a large PLC; 'GetTypeInfo' returns them for one type")] bool includeAttributes = false)
         {
             try
             {
@@ -71,7 +72,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 {
                     if (type != null)
                     {
-                        var attributes = Helper.GetAttributeList(type);
+                        var attributes = includeAttributes ? Helper.GetAttributeList(type) : null;
 
                         responseList.Add(new ResponseTypeInfo
                         {

@@ -12,6 +12,30 @@
 
 ### Fixed
 
+- __Block and type names with `[ ]` resolve without escaping__: `GetBlock`/`GetType` (and with them
+  `GetBlockSource`, `GetTypeSource`, exports and `FindInCode`) treated any name containing a regex
+  character as a regex, so `5_G2U1_Home[0]` looked for `5_G2U1_Home0` and was "not found" unless written
+  `5_G2U1_Home\[0\]`. An exact name is now tried first (`Blocks.Find` / `Types.Find`, one Openness call),
+  the regex reading only after that.
+- __`FindInCode` reports inconsistent objects__: blocks and types that are not compiled were dropped
+  silently, so a search over a just-edited block returned "0 objects searched". They are now listed in
+  `unsearchable` as "inconsistent - compile the software first".
+- __`GetTypeSource` falls back to XML before V21__: type source documents need V21, and the version check
+  raised an error `ReadSource` does not fall back on, so on V20 every type failed - and `FindInCode` listed
+  every PLC data type as unsearchable. It now returns the SimaticML text with `format: "xml"`, like blocks
+  without a source document.
+
+### Performance
+
+- __`FindInCode` no longer re-resolves every object__: it kept only the path of each candidate and then
+  resolved it up to three times (source read, document export, XML fallback), each time walking the device
+  list and the group tree again. It now reads the objects `GetBlocks`/`GetTypes` returned directly.
+  `GetState` progress also covers the listing phase, which was invisible before.
+- __`GetBlocks` / `GetTypes` skip the attribute list by default__: reading all ~30 Openness attributes per
+  object was most of their run time (measured on the Mahindra CPU01 project: 70 blocks in ~14 s with
+  attributes, the name walk of the whole PLC in ~9 s). The new `includeAttributes` argument (default
+  `false`) brings them back; `GetBlockInfo` / `GetTypeInfo` still return them for one object.
+
 - __`OpenProject` / `OpenTiaProject` reuse an already open project__: the tool used to close the current
   project before looking for the requested one, so an open project was always closed and reopened. The
   lookup now runs first and matches by file path (not by name), so a project already open in the TIA Portal

@@ -43,6 +43,15 @@ namespace TiaMcpServer.Siemens
                     var group = GetPlcTypeGroupByPath(softwarePath, path);
                     if (group is not null)
                     {
+                        // Exact name first, for the same reason as GetBlock: names with '[ ]'
+                        // must resolve without regex escaping.
+                        type = group.Types.Find(regexName);
+
+                        if (type is not null)
+                        {
+                            return type;
+                        }
+
                         if (regexName.IndexOfAny(_regexChars) >= 0)
                         {
                             try
