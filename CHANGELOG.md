@@ -31,10 +31,10 @@
   resolved it up to three times (source read, document export, XML fallback), each time walking the device
   list and the group tree again. It now reads the objects `GetBlocks`/`GetTypes` returned directly.
   `GetState` progress also covers the listing phase, which was invisible before.
-- __`GetBlocks` / `GetTypes` skip the attribute list by default__: reading all ~30 Openness attributes per
-  object was most of their run time (measured on the Mahindra CPU01 project: 70 blocks in ~14 s with
-  attributes, the name walk of the whole PLC in ~9 s). The new `includeAttributes` argument (default
-  `false`) brings them back; `GetBlockInfo` / `GetTypeInfo` still return them for one object.
+- __`GetBlocks` / `GetTypes` can skip the attribute list__: reading all ~30 Openness attributes per
+  object is most of their run time (measured on the Mahindra CPU01 project: 70 blocks in ~14 s with
+  attributes, the name walk of the whole PLC in ~9 s). The new `includeAttributes` argument defaults to
+  `true`, so existing calls get the same response; pass `false` on a large PLC to list names and paths only.
 
 - __`OpenProject` / `OpenTiaProject` reuse an already open project__: the tool used to close the current
   project before looking for the requested one, so an open project was always closed and reopened. The

@@ -66,7 +66,7 @@ namespace TiaMcpServer.ModelContextProtocol
         public static ResponseBlocks GetBlocks(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("regexName: defines the name or regular expression to find the block. Use empty string (default) to find all")] string regexName = "",
-            [Description("includeAttributes: also return every Openness attribute of each block (about 30 each). Off by default - reading them is most of this tool's run time on a large PLC; 'GetBlockInfo' returns them for one block")] bool includeAttributes = false)
+            [Description("includeAttributes: return every Openness attribute of each block (about 30 each). Default true. Pass false on a large PLC when only names and paths are needed - reading the attributes is most of this tool's run time")] bool includeAttributes = true)
         {
             try
             {
