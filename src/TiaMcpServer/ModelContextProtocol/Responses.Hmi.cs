@@ -73,4 +73,21 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         public IEnumerable<ResponseHmiTextListInfo>? Items { get; set; }
     }
+
+    public class ResponseHmiScreenItems : ResponseMessage
+    {
+        public IEnumerable<TiaMcpServer.Siemens.HmiScreenItemDescription>? Items { get; set; }
+    }
+
+    /// <summary>Result of an HMI screen item write: the item as read back after the change.</summary>
+    public class ResponseHmiScreenItemWrite : ResponseMessage
+    {
+        public TiaMcpServer.Siemens.HmiScreenItemDescription? Item { get; set; }
+    }
+
+    /// <summary>Result of an HMI tag write: the tag as read back after the change.</summary>
+    public class ResponseHmiTagWrite : ResponseMessage
+    {
+        public ResponseHmiTagInfo? Tag { get; set; }
+    }
 }

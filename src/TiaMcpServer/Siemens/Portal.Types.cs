@@ -232,7 +232,8 @@ namespace TiaMcpServer.Siemens
                     catch (Exception ex)
                     {
                         throw new PortalException(PortalErrorCode.ImportFailed,
-                            $"TIA Portal rejected the PLC data type import from '{importPath}': {Operation.DescribeChain(ex)}", null, ex);
+                            $"TIA Portal rejected the PLC data type import from '{importPath}': {Operation.DescribeChain(ex)}" +
+                            (OnlineHint(GetSoftwareContainer(softwarePath)) ?? string.Empty), null, ex);
                     }
 
                     if (list == null || list.Count == 0)

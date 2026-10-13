@@ -3,6 +3,7 @@ using Siemens.Engineering.Compiler;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.Multiuser;
+using Siemens.Engineering.Online;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.ExternalSources;
 using Siemens.Engineering.SW.Tags;
@@ -96,15 +97,38 @@ namespace TiaMcpServer.Siemens
                     }
                     catch (Exception ex)
                     {
-                        // Typical live causes: a modal dialog open in the TIA Portal UI, or the
-                        // project being edited there at the same moment.
+                        // Live cause (2026-10-13): TIA Portal was online with the PLC, and the
+                        // compile only worked after going offline. Other causes seen: a modal
+                        // dialog open in the TIA Portal UI, or an edit running there.
                         throw new PortalException(PortalErrorCode.InvalidState,
-                            $"TIA Portal refused to compile '{softwarePath}': {ex.GetType().Name}: {ex.Message}" +
-                            (ex.InnerException != null ? $" ({ex.InnerException.Message})" : string.Empty) +
-                            " - check for an open dialog or a running edit in the TIA Portal window.", null, ex);
+                            $"TIA Portal refused to compile '{softwarePath}': {Operation.DescribeChain(ex)}." +
+                            (OnlineHint(softwareContainer) ?? " Check for an open dialog or a running edit in the TIA Portal window."),
+                            null, ex);
                     }
                 },
                 ("softwarePath", softwarePath));
+        }
+
+        /// <summary>
+        /// " Go offline first..." when the device holding this software is online in TIA Portal,
+        /// else null. Compile and block import both fail while online, and TIA's own exception
+        /// does not say so.
+        /// </summary>
+        private string? OnlineHint(SoftwareContainer? softwareContainer)
+        {
+            try
+            {
+                var state = (softwareContainer?.Parent as DeviceItem)?.GetService<OnlineProvider>()?.State;
+
+                return state is OnlineState.Online or OnlineState.Connecting
+                    ? $" TIA Portal is {state} with this PLC - go offline first ('GoOffline' or the Go offline button), then retry."
+                    : null;
+            }
+            catch (Exception)
+            {
+                // Only a hint; never let it hide the real failure.
+                return null;
+            }
         }
 
         #endregion

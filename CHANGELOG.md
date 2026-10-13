@@ -4,6 +4,12 @@
 
 ### Added
 
+- __WinCC Unified screen tools__ (REQUESTS.md P9-2): `GetHmiScreenItems` lists the items of one screen
+  with kind, position, size, text, IO field process value and tag bindings. With `--allow-write`:
+  `CreateHmiScreen`, `DeleteHmiScreen`, `CreateHmiScreenItem` (Button, IOField, Label, Text, Rectangle;
+  an IOField can be bound to a tag on create), `UpdateHmiScreenItem`, `DeleteHmiScreenItem`, `BindHmiTag`
+  (tag dynamization of any item property) and `CreateHmiTag` (internal or PLC-linked). Every write returns
+  the object as read back after the change. Written against the V20 Openness API; not yet live-tested.
 - __Preset tool arguments__: the new command line arguments `--project-path`, `--software-path`,
   `--export-path`, `--preserve-path` and `--with-dependencies` preset the `path`, `softwarePath`, `exportPath`, `preservePath` and `withDependencies` arguments of every tool
   that declares them. A preset argument is no longer `required` in the tool schema and is filled in when
@@ -12,6 +18,9 @@
 
 ### Fixed
 
+- __Compile and block import say when TIA Portal is online__: both fail while the engineering station is
+  online with the PLC (live, 2026-10-13), and TIA's exception does not say so. The error now ends with "go
+  offline first" when the PLC's online state is Online or Connecting.
 - __Source reads fall back to XML on any document export failure__: `GetBlockSource` / `FindInCode` fell
   back to SimaticML only for "not supported" errors. LAD blocks in a project last edited before V20
   Update 4 fail with a SimaticSdEnabler error instead, so they were unreadable and `FindInCode` skipped
