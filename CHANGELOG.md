@@ -4,6 +4,12 @@
 
 ### Added
 
+- __WinCC Unified faceplates__: `CreateHmiFaceplate` places a faceplate container of a library faceplate
+  type on a screen; `SetHmiFaceplateInterface` sets one interface property to a static value or binds it
+  to an HMI tag. `GetHmiScreenItems` now also returns `faceplateType` and `faceplateInterface` for
+  faceplate containers, and position/size for window-type items (faceplate containers, screen windows),
+  which were empty before (added fields only).
+
 - __WinCC Unified screen tools__ (REQUESTS.md P9-2): `GetHmiScreenItems` lists the items of one screen
   with kind, position, size, text, IO field process value and tag bindings. With `--allow-write`:
   `CreateHmiScreen`, `DeleteHmiScreen`, `CreateHmiScreenItem` (Button, IOField, Label, Text, Rectangle;

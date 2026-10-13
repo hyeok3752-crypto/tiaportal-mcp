@@ -4,6 +4,8 @@ using Siemens.Engineering.HmiUnified;
 using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HmiUnified.UI;
 using Siemens.Engineering.HmiUnified.UI.Base;
+using Siemens.Engineering.HmiUnified.UI.Controls;
+using Siemens.Engineering.HmiUnified.UI.Parts;
 using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.ScreenGroup;
 using Siemens.Engineering.HmiUnified.UI.Screens;
@@ -101,6 +103,18 @@ namespace TiaMcpServer.Siemens
                     description.Width = shape.Width;
                     description.Height = shape.Height;
                     break;
+                case HmiWindowBase window:
+                    description.Left = window.Left;
+                    description.Top = window.Top;
+                    description.Width = window.Width;
+                    description.Height = window.Height;
+                    break;
+            }
+
+            if (item is HmiFaceplateContainer faceplate)
+            {
+                description.FaceplateType = faceplate.ContainedType;
+                description.FaceplateInterface = faceplate.Interface.Select(DescribeFaceplateInterface).ToList();
             }
 
             description.Text = item switch
@@ -303,6 +317,174 @@ namespace TiaMcpServer.Siemens
         }
 
         /// <summary>
+        /// Places a faceplate on a screen. 'faceplateType' is the faceplate type as TIA Portal names
+        /// it in the container's "Contained type", e.g. 'FP_Motor V 0.0.1' - read an existing one with
+        /// 'GetHmiScreenItems'. The type must already be in the project library.
+        /// </summary>
+        public HmiScreenItemBase CreateHmiFaceplate(
+            string softwarePath,
+            string screenName,
+            string name,
+            string faceplateType,
+            int? left = null,
+            int? top = null,
+            uint? width = null,
+            uint? height = null)
+        {
+            return Operation.Run(_logger, nameof(CreateHmiFaceplate), PortalErrorCode.CreateFailed,
+                () =>
+                {
+                    EnsureValidName(name);
+
+                    if (string.IsNullOrWhiteSpace(faceplateType))
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            "'faceplateType' is required, e.g. 'FP_Motor V 0.0.1'. 'GetHmiScreenItems' shows the type of faceplates already placed.");
+                    }
+
+                    var screen = RequireHmiScreen(RequireHmiSoftware(softwarePath), screenName);
+
+                    if (screen.ScreenItems.Find(name) != null)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            $"Screen '{screenName}' already has an item named '{name}'.");
+                    }
+
+                    var container = screen.ScreenItems.Create<HmiFaceplateContainer>(name);
+
+                    try
+                    {
+                        container.ContainedType = faceplateType;
+                    }
+                    catch (Exception ex) when (ex is not PortalException)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            $"TIA Portal refused faceplate type '{faceplateType}': {Operation.DescribeChain(ex)}. " +
+                            "Use the exact name and version shown as 'faceplateType' by 'GetHmiScreenItems' on a screen that already has it.",
+                            null, ex);
+                    }
+
+                    ApplyHmiItemProperties(container, left, top, width, height, null);
+
+                    return container;
+                },
+                ("softwarePath", softwarePath), ("screenName", screenName), ("name", name), ("faceplateType", faceplateType));
+        }
+
+        /// <summary>
+        /// Sets one interface property of a placed faceplate: a static 'value', or a 'tag' binding.
+        /// </summary>
+        public HmiScreenItemBase SetHmiFaceplateInterface(
+            string softwarePath,
+            string screenName,
+            string itemName,
+            string propertyName,
+            string? value = null,
+            string? tag = null)
+        {
+            return Operation.Run(_logger, nameof(SetHmiFaceplateInterface), PortalErrorCode.InvalidParams,
+                () =>
+                {
+                    if (string.IsNullOrEmpty(value) == string.IsNullOrEmpty(tag))
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, "Pass exactly one of 'value' or 'tag'.");
+                    }
+
+                    var container = RequireHmiScreenItem(softwarePath, screenName, itemName) as HmiFaceplateContainer
+                        ?? throw new PortalException(PortalErrorCode.InvalidParams,
+                            $"'{itemName}' on screen '{screenName}' is not a faceplate.");
+
+                    var property = container.Interface.Find(propertyName)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"Faceplate '{itemName}' ({container.ContainedType}) has no interface property '{propertyName}'. " +
+                            $"Available: {string.Join(", ", container.Interface.Select(p => p.PropertyName))}.");
+
+                    if (!string.IsNullOrEmpty(tag))
+                    {
+                        BindFaceplateInterfaceTag(property, itemName, tag!);
+                        return container;
+                    }
+
+                    SetInterfaceValue(property, value!);
+
+                    return container;
+                },
+                ("softwarePath", softwarePath), ("screenName", screenName), ("itemName", itemName), ("propertyName", propertyName));
+        }
+
+        /// <summary>
+        /// The dynamization on a faceplate interface property is keyed by the property's own name in
+        /// the samples seen so far; "Value" is tried as well in case this TIA Portal version keys it so.
+        /// </summary>
+        private static void BindFaceplateInterfaceTag(HmiFaceplateInterface property, string itemName, string tagName)
+        {
+            try
+            {
+                BindTag(property, itemName, "faceplate interface", property.PropertyName, tagName);
+            }
+            catch (PortalException first) when (first.Code == PortalErrorCode.InvalidParams)
+            {
+                try
+                {
+                    BindTag(property, itemName, "faceplate interface", "Value", tagName);
+                }
+                catch (PortalException)
+                {
+                    throw first;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The interface value is typed by the faceplate (Bool, Int, String, ...) but exposed as object;
+        /// the string is tried first, then the same text as bool, integer and number.
+        /// </summary>
+        private static void SetInterfaceValue(HmiFaceplateInterface property, string value)
+        {
+            var candidates = new List<object> { value };
+
+            if (bool.TryParse(value, out var b)) candidates.Add(b);
+            if (long.TryParse(value, out var l))
+            {
+                candidates.Add((int)l);
+                candidates.Add(l);
+            }
+            if (double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d)) candidates.Add(d);
+
+            Exception? last = null;
+
+            foreach (var candidate in candidates)
+            {
+                try
+                {
+                    property.Value = candidate;
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                }
+            }
+
+            throw new PortalException(PortalErrorCode.InvalidParams,
+                $"TIA Portal refused value '{value}' for faceplate interface '{property.PropertyName}': {Operation.DescribeChain(last!)}.",
+                null, last);
+        }
+
+        private static HmiFaceplateInterfaceDescription DescribeFaceplateInterface(HmiFaceplateInterface property)
+        {
+            var binding = property.Dynamizations.FirstOrDefault();
+
+            return new HmiFaceplateInterfaceDescription
+            {
+                PropertyName = property.PropertyName,
+                Value = binding == null ? property.Value?.ToString() : null,
+                Tag = (binding as TagDynamization)?.Tag,
+                DynamizationType = binding?.DynamizationType.ToString()
+            };
+        }
+
+        /// <summary>
         /// Creates an HMI tag in a tag table. With 'connection' and 'plcTag' it is linked to a PLC
         /// tag (e.g. connection 'HMI_Connection_1', plcTag '"MainAssy".Mode.Dry_Run'); without them
         /// it is an internal tag of 'dataType'.
@@ -442,6 +624,12 @@ namespace TiaMcpServer.Siemens
                     if (width.HasValue) shape.Width = width.Value;
                     if (height.HasValue) shape.Height = height.Value;
                     break;
+                case HmiWindowBase window:
+                    if (left.HasValue) window.Left = left.Value;
+                    if (top.HasValue) window.Top = top.Value;
+                    if (width.HasValue) window.Width = width.Value;
+                    if (height.HasValue) window.Height = height.Value;
+                    break;
             }
 
             if (text == null)
@@ -482,9 +670,13 @@ namespace TiaMcpServer.Siemens
             }
         }
 
-        private static void BindTag(HmiScreenItemBase item, string propertyName, string tagName)
+        private static void BindTag(HmiScreenItemBase item, string propertyName, string tagName) =>
+            BindTag(item, item.Name, KindOf(item), propertyName, tagName);
+
+        /// <summary>Tag dynamization on any UI object: a screen item, or a faceplate interface property.</summary>
+        private static void BindTag(UIBase target, string targetName, string targetKind, string propertyName, string tagName)
         {
-            var existing = item.Dynamizations.Find(propertyName);
+            var existing = target.Dynamizations.Find(propertyName);
 
             if (existing is TagDynamization tagDynamization)
             {
@@ -495,19 +687,19 @@ namespace TiaMcpServer.Siemens
             if (existing != null)
             {
                 throw new PortalException(PortalErrorCode.InvalidState,
-                    $"'{item.Name}.{propertyName}' already has a {existing.DynamizationType} dynamization; remove it in TIA Portal first.");
+                    $"'{targetName}.{propertyName}' already has a {existing.DynamizationType} dynamization; remove it in TIA Portal first.");
             }
 
             try
             {
-                var created = item.Dynamizations.Create<TagDynamization>(propertyName);
+                var created = target.Dynamizations.Create<TagDynamization>(propertyName);
                 created.Tag = tagName;
             }
             catch (Exception ex) when (ex is not PortalException)
             {
                 throw new PortalException(PortalErrorCode.InvalidParams,
-                    $"TIA Portal refused to bind '{item.Name}.{propertyName}' to HMI tag '{tagName}': {Operation.DescribeChain(ex)}. " +
-                    $"Check that a {KindOf(item)} has a property '{propertyName}' (e.g. a Rectangle has BackColor and BorderColor, no ForeColor) " +
+                    $"TIA Portal refused to bind '{targetName}.{propertyName}' to HMI tag '{tagName}': {Operation.DescribeChain(ex)}. " +
+                    $"Check that a {targetKind} has a property '{propertyName}' (e.g. a Rectangle has BackColor and BorderColor, no ForeColor) " +
                     "and that the tag exists ('GetHmiTags').", null, ex);
             }
         }
@@ -546,6 +738,26 @@ namespace TiaMcpServer.Siemens
         public string? OutputFormat { get; set; }
 
         public List<HmiDynamizationDescription> Dynamizations { get; set; } = new List<HmiDynamizationDescription>();
+
+        /// <summary>Faceplate containers only: the contained faceplate type, e.g. 'FP_Motor V 0.0.1'.</summary>
+        public string? FaceplateType { get; set; }
+
+        /// <summary>Faceplate containers only: the interface properties with their static value or bound tag.</summary>
+        public List<HmiFaceplateInterfaceDescription>? FaceplateInterface { get; set; }
+    }
+
+    public class HmiFaceplateInterfaceDescription
+    {
+        public string PropertyName { get; set; } = string.Empty;
+
+        /// <summary>Static value, when the property is not dynamized.</summary>
+        public string? Value { get; set; }
+
+        /// <summary>The bound HMI tag, for a tag dynamization.</summary>
+        public string? Tag { get; set; }
+
+        /// <summary>Dynamization type when bound (Tag, Script, ...); null for a static value.</summary>
+        public string? DynamizationType { get; set; }
     }
 
     public class HmiDynamizationDescription

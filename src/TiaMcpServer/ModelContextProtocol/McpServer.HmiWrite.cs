@@ -19,7 +19,7 @@ namespace TiaMcpServer.ModelContextProtocol
         #region read
 
         [McpServerTool(Name = "GetHmiScreenItems", Title = "Get HMI screen items", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
-         Description("List the items of one WinCC Unified screen with their kind, position, size, text, IO field process value and tag bindings (dynamizations)")]
+         Description("List the items of one WinCC Unified screen with their kind, position, size, text, IO field process value and tag bindings (dynamizations); for faceplates also the faceplate type and interface values/tags")]
         public static ResponseHmiScreenItems GetHmiScreenItems(
             [Description(HmiPathDescription)] string softwarePath,
             [Description("screenName: name of the screen, as 'GetHmiScreens' lists it")] string screenName,
@@ -159,6 +159,48 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 var item = Portal.BindHmiTag(softwarePath, screenName, itemName, propertyName, tagName);
                 return HmiItemWritten(MissingTagWarning(softwarePath, tagName) + $"'{itemName}.{propertyName}' on screen '{screenName}' bound to HMI tag '{tagName}'.", item);
+            });
+        }
+
+        [WriteTool]
+        [McpServerTool(Name = "CreateHmiFaceplate", Title = "Create HMI faceplate", Destructive = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Place a faceplate (faceplate container) on a WinCC Unified screen. The faceplate type must already be in the project library; 'GetHmiScreenItems' shows the 'faceplateType' and interface of faceplates already placed. Set its interface with 'SetHmiFaceplateInterface'. Returns the item as read back, with its interface properties")]
+        public static ResponseHmiScreenItemWrite CreateHmiFaceplate(
+            [Description(HmiPathDescription)] string softwarePath,
+            [Description("screenName: name of the screen")] string screenName,
+            [Description("name: name of the new faceplate container, unique on the screen")] string name,
+            [Description("faceplateType: the faceplate type with version, exactly as 'GetHmiScreenItems' shows it, e.g. 'FP_Motor V 0.0.1'")] string faceplateType,
+            [Description("left: optional x position in pixels")] int? left = null,
+            [Description("top: optional y position in pixels")] int? top = null,
+            [Description("width: optional width in pixels")] uint? width = null,
+            [Description("height: optional height in pixels")] uint? height = null)
+        {
+            return Guarded(nameof(CreateHmiFaceplate), () =>
+            {
+                var item = Portal.CreateHmiFaceplate(softwarePath, screenName, name, faceplateType, left, top, width, height);
+                return HmiItemWritten($"Faceplate '{name}' ({faceplateType}) created on screen '{screenName}'.", item);
+            });
+        }
+
+        [WriteTool]
+        [McpServerTool(Name = "SetHmiFaceplateInterface", Title = "Set HMI faceplate interface", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Set one interface property of a faceplate on a WinCC Unified screen, either to a static 'value' or bound to an HMI 'tag' (pass exactly one). Returns the faceplate as read back, with all its interface properties")]
+        public static ResponseHmiScreenItemWrite SetHmiFaceplateInterface(
+            [Description(HmiPathDescription)] string softwarePath,
+            [Description("screenName: name of the screen")] string screenName,
+            [Description("itemName: name of the faceplate container")] string itemName,
+            [Description("propertyName: the interface property, as listed under 'faceplateInterface' by 'GetHmiScreenItems'")] string propertyName,
+            [Description("value: optional static value, e.g. 'true', '5' or a text")] string? value = null,
+            [Description("tag: optional HMI tag to bind to the property, as 'GetHmiTags' lists it")] string? tag = null)
+        {
+            return Guarded(nameof(SetHmiFaceplateInterface), () =>
+            {
+                var item = Portal.SetHmiFaceplateInterface(softwarePath, screenName, itemName, propertyName, value, tag);
+                var what = string.IsNullOrEmpty(tag)
+                    ? $"Faceplate '{itemName}' interface '{propertyName}' set to '{value}'."
+                    : $"Faceplate '{itemName}' interface '{propertyName}' bound to HMI tag '{tag}'.";
+
+                return HmiItemWritten(MissingTagWarning(softwarePath, tag) + what, item);
             });
         }
 
