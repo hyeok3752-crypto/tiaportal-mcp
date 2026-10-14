@@ -100,6 +100,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     {
                         Name = screen.Name,
                         DisplayName = Helper.FirstText(screen.DisplayName),
+                        DisplayText = TiaMcpServer.Siemens.Portal.PlainText(Helper.FirstText(screen.DisplayName)),
                         ScreenNumber = screen.ScreenNumber,
                         Width = screen.Width,
                         Height = screen.Height

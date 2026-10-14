@@ -19,22 +19,27 @@ namespace TiaMcpServer.ModelContextProtocol
         #region read
 
         [McpServerTool(Name = "GetHmiScreenItems", Title = "Get HMI screen items", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
-         Description("List the items of one WinCC Unified screen with their kind, position, size, text, IO field process value and tag bindings (dynamizations); for faceplates also the faceplate type and interface values/tags")]
+         Description("List the items of one WinCC Unified screen with their kind, position, size, text, IO field process value and tag bindings (dynamizations); for faceplates also the faceplate type and interface values/tags; with includeScripts the event scripts of each item and of the screen itself (e.g. what a button does when pressed)")]
         public static ResponseHmiScreenItems GetHmiScreenItems(
             [Description(HmiPathDescription)] string softwarePath,
             [Description("screenName: name of the screen, as 'GetHmiScreens' lists it")] string screenName,
-            [Description("regexName: optional name or regular expression to filter the items. Empty (default) lists all")] string regexName = "")
+            [Description("regexName: optional name or regular expression to filter the items. Empty (default) lists all")] string regexName = "",
+            [Description("includeScripts: also return event handler scripts (button press, screen loaded, ...) and script dynamization code. Default true; pass false for a shorter reply")] bool includeScripts = true)
         {
             try
             {
                 var items = Portal.GetHmiScreenItems(softwarePath, screenName, regexName)
-                    .Select(Portal.DescribeHmiScreenItem)
+                    .Select(item => Portal.DescribeHmiScreenItem(item, includeScripts))
                     .ToList();
+
+                var screenEvents = includeScripts ? Portal.DescribeHmiScreenEvents(softwarePath, screenName) : null;
 
                 return new ResponseHmiScreenItems
                 {
-                    Message = $"{items.Count} item(s) on screen '{screenName}' in '{softwarePath}'",
+                    Message = $"{items.Count} item(s) on screen '{screenName}' in '{softwarePath}'" +
+                              (includeScripts ? $", {items.Sum(i => i.Events?.Count ?? 0) + (screenEvents?.Count ?? 0)} event script(s)" : string.Empty),
                     Items = items,
+                    ScreenEvents = screenEvents?.Count > 0 ? screenEvents : null,
                     Meta = new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true, ["count"] = items.Count }
                 };
             }

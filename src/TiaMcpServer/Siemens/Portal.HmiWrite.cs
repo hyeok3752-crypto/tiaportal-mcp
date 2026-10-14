@@ -80,7 +80,14 @@ namespace TiaMcpServer.Siemens
         }
 
         /// <summary>Flat description of one screen item, used by the read tool and as the read-back of every write.</summary>
-        public HmiScreenItemDescription DescribeHmiScreenItem(HmiScreenItemBase item)
+        public HmiScreenItemDescription DescribeHmiScreenItem(HmiScreenItemBase item) => DescribeHmiScreenItem(item, false);
+
+        /// <summary>
+        /// With 'includeScripts' also the event handler scripts and script dynamization code. Only the
+        /// read tool asks for them: the write tools' read-back runs inside their transaction, where
+        /// any unexpected exception would make TIA Portal refuse the commit.
+        /// </summary>
+        public HmiScreenItemDescription DescribeHmiScreenItem(HmiScreenItemBase item, bool includeScripts)
         {
             var description = new HmiScreenItemDescription
             {
@@ -137,11 +144,76 @@ namespace TiaMcpServer.Siemens
                 {
                     PropertyName = dynamization.PropertyName,
                     Type = dynamization.DynamizationType.ToString(),
-                    Tag = (dynamization as TagDynamization)?.Tag
+                    Tag = (dynamization as TagDynamization)?.Tag,
+                    ScriptCode = includeScripts
+                        ? (dynamization as global::Siemens.Engineering.HmiUnified.UI.Dynamization.Script.ScriptDynamization)?.ScriptCode
+                        : null
                 });
             }
 
+            if (includeScripts)
+            {
+                var events = DescribeHmiEvents(item);
+                description.Events = events.Count > 0 ? events : null;
+            }
+
             return description;
+        }
+
+        /// <summary>Event handler scripts of the screen itself (Loaded, Cleared, ...).</summary>
+        public List<HmiEventDescription> DescribeHmiScreenEvents(string softwarePath, string screenName)
+        {
+            return Operation.Run(_logger, nameof(DescribeHmiScreenEvents), PortalErrorCode.NotFound,
+                () => DescribeHmiEvents(RequireHmiScreen(RequireHmiSoftware(softwarePath), screenName)),
+                ("softwarePath", softwarePath), ("screenName", screenName));
+        }
+
+        /// <summary>
+        /// Event handlers are typed per item kind (HmiButtonEventHandlerComposition, ...) with no
+        /// common base, so they are read by reflection: EventType and Script on each handler.
+        /// </summary>
+        public static List<HmiEventDescription> DescribeHmiEvents(object owner)
+        {
+            var result = new List<HmiEventDescription>();
+
+            if (owner.GetType().GetProperty("EventHandlers")?.GetValue(owner) is not System.Collections.IEnumerable handlers)
+            {
+                return result;
+            }
+
+            foreach (var handler in handlers)
+            {
+                var eventType = handler.GetType().GetProperty("EventType")?.GetValue(handler);
+
+                if (handler.GetType().GetProperty("Script")?.GetValue(handler) is not global::Siemens.Engineering.HmiUnified.UI.Dynamization.Script.IHmiScript script)
+                {
+                    continue;
+                }
+
+                result.Add(new HmiEventDescription
+                {
+                    EventType = eventType?.ToString() ?? string.Empty,
+                    ScriptCode = script.ScriptCode,
+                    GlobalDefinitionAreaScriptCode = string.IsNullOrWhiteSpace(script.GlobalDefinitionAreaScriptCode) ? null : script.GlobalDefinitionAreaScriptCode,
+                    Async = script.Async
+                });
+            }
+
+            return result;
+        }
+
+        /// <summary>The plain text of a Unified rich text value such as '&lt;body&gt;&lt;p&gt;Main&lt;/p&gt;&lt;/body&gt;'; null when empty.</summary>
+        public static string? PlainText(string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return null;
+            }
+
+            var text = Regex.Replace(value, @"<br\s*/?>", " ", RegexOptions.IgnoreCase);
+            text = System.Net.WebUtility.HtmlDecode(Regex.Replace(text, "<[^>]*>", string.Empty)).Trim();
+
+            return text.Length == 0 ? null : text;
         }
 
         #endregion
@@ -758,6 +830,9 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>Faceplate containers only: the interface properties with their static value or bound tag.</summary>
         public List<HmiFaceplateInterfaceDescription>? FaceplateInterface { get; set; }
+
+        /// <summary>Event handler scripts of the item (read tool only).</summary>
+        public List<HmiEventDescription>? Events { get; set; }
     }
 
     public class HmiFaceplateInterfaceDescription
@@ -782,5 +857,18 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>The bound HMI tag, for a tag dynamization.</summary>
         public string? Tag { get; set; }
+
+        /// <summary>The script, for a script dynamization (read tool only).</summary>
+        public string? ScriptCode { get; set; }
+    }
+
+    public class HmiEventDescription
+    {
+        /// <summary>e.g. Activated, Up, Down, Loaded.</summary>
+        public string EventType { get; set; } = string.Empty;
+
+        public string? ScriptCode { get; set; }
+        public string? GlobalDefinitionAreaScriptCode { get; set; }
+        public bool Async { get; set; }
     }
 }

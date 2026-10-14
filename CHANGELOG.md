@@ -4,6 +4,14 @@
 
 ### Added
 
+- __HMI event scripts readable__: `GetHmiScreenItems` gets `includeScripts` (default true) and returns the
+  event handler scripts of each item (`events`: eventType, scriptCode, ...), the screen's own event scripts
+  (`screenEvents`) and the code of script dynamizations (`dynamizations[].scriptCode`). Added fields only;
+  the write tools' read-back does not read scripts. Answers "what does this button/popup actually do",
+  which no tool could show before.
+- __GetHmiScreens displayText__: the screen display name as plain text (`displayName` keeps the raw
+  `<body><p>..</p></body>` value).
+
 - __CopyHmiScreen__ (write): copies a WinCC Unified screen to a new screen in the same folder with
   optional `replace` ('Servo01=>Servo02;...') applied to every copied string - tag names, texts, scripts,
   faceplate interface values. V20 Openness has no Unified screen copy/export, so the copy is rebuilt item

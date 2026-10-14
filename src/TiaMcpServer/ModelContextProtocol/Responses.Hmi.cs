@@ -37,6 +37,10 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         public string? Name { get; set; }
         public string? DisplayName { get; set; }
+
+        /// <summary>DisplayName as plain text without the rich text markup; null when empty.</summary>
+        public string? DisplayText { get; set; }
+
         public int? ScreenNumber { get; set; }
         public uint? Width { get; set; }
         public uint? Height { get; set; }
@@ -77,6 +81,9 @@ namespace TiaMcpServer.ModelContextProtocol
     public class ResponseHmiScreenItems : ResponseMessage
     {
         public IEnumerable<TiaMcpServer.Siemens.HmiScreenItemDescription>? Items { get; set; }
+
+        /// <summary>Event handler scripts of the screen itself (includeScripts only).</summary>
+        public IEnumerable<TiaMcpServer.Siemens.HmiEventDescription>? ScreenEvents { get; set; }
     }
 
     /// <summary>Result of an HMI screen item write: the item as read back after the change.</summary>
