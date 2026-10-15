@@ -65,9 +65,14 @@ namespace TiaMcpServer.ModelContextProtocol
 
         private static readonly TimeSpan CopyBudget = TimeSpan.FromSeconds(40);
 
+        // The snapshot of the last series source, so a continued call (from=nextNumber) skips re-reading it
+        private static readonly TimeSpan SnapshotReuse = TimeSpan.FromMinutes(10);
+        private static readonly object SeriesLock = new object();
+        private static (string Key, DateTime ReadAt, HmiScreenSnapshot Snapshot)? _seriesSnapshot;
+
         [WriteTool]
         [McpServerTool(Name = "CopyHmiScreens", Title = "Copy HMI screen to a series", Destructive = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Make a numbered series of WinCC Unified screens from one screen, e.g. the screens of servo 2..60 from the screen of servo 1. Each copy works like 'CopyHmiScreen'; in 'newScreenName' and 'replace' the placeholder %n% is the number, %n2%/%n3% the number with leading zeros. Each screen is its own transaction. Stops before a copy that would end after about 40 s, to stay inside the client timeout and returns 'nextNumber' - call again with from=nextNumber to continue. Screens that already exist are skipped, so a repeated call is safe")]
+         Description("Make a numbered series of WinCC Unified screens from one screen, e.g. the screens of servo 2..60 from the screen of servo 1. Each copy works like 'CopyHmiScreen'; in 'newScreenName' and 'replace' the placeholder %n% is the number, %n2%/%n3% the number with leading zeros. Each screen is its own transaction. Stops before a copy that would end after about 40 s, to stay inside the client timeout and returns 'nextNumber' - call again with from=nextNumber to continue. Screens that already exist are skipped, so a repeated call is safe. A continued call within 10 minutes reuses the source as the previous call read it")]
         public static ResponseHmiScreenCopies CopyHmiScreens(
             [Description(HmiPathDescription)] string softwarePath,
             [Description("screenName: the screen to copy, as 'GetHmiScreens' lists it")] string screenName,
@@ -90,16 +95,35 @@ namespace TiaMcpServer.ModelContextProtocol
             ParseReplacements(Number(replace, from)); // validate the format once up front
 
             var clock = System.Diagnostics.Stopwatch.StartNew();
+            var key = $"{Portal.GetHashCode()}|{softwarePath}|{screenName}";
             HmiScreenSnapshot snapshot;
+            bool reused;
 
-            try
+            lock (SeriesLock)
             {
-                snapshot = Portal.ReadHmiScreenSnapshot(softwarePath, screenName);
+                var cached = _seriesSnapshot;
+                reused = cached.HasValue && cached.Value.Key == key && DateTime.UtcNow - cached.Value.ReadAt < SnapshotReuse;
+                snapshot = reused ? cached!.Value.Snapshot : null!;
             }
-            catch (PortalException pex)
+
+            if (!reused)
             {
-                throw new McpException(pex.Message, pex);
+                try
+                {
+                    snapshot = Portal.ReadHmiScreenSnapshot(softwarePath, screenName);
+                }
+                catch (PortalException pex)
+                {
+                    throw new McpException(pex.Message, pex);
+                }
+
+                lock (SeriesLock)
+                {
+                    _seriesSnapshot = (key, DateTime.UtcNow, snapshot);
+                }
             }
+
+            var snapshotSeconds = clock.Elapsed.TotalSeconds;
 
             var longest = TimeSpan.Zero;
             var created = new List<string>();
@@ -149,6 +173,9 @@ namespace TiaMcpServer.ModelContextProtocol
                               : ".") +
                           $" {SaveHint}",
                 Created = created,
+                SnapshotReused = reused ? true : (bool?)null,
+                SnapshotSeconds = Math.Round(snapshotSeconds, 1),
+                SecondsPerScreen = created.Count > 0 ? Math.Round((clock.Elapsed.TotalSeconds - snapshotSeconds) / created.Count, 1) : (double?)null,
                 AlreadyExisted = existing.Count > 0 ? existing : null,
                 NextNumber = next,
                 Skipped = snapshot.Skipped.Count > 0 ? snapshot.Skipped : null,

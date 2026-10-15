@@ -9,7 +9,7 @@
 
 ### Added
 
-- `CopyHmiScreens`: make a numbered series of WinCC Unified screens from one screen (`%n%`/`%n2%`/`%n3%` placeholders in name and replace rules, optional `screenNumberStart`). One transaction per screen, existing names are skipped, stops after ~40 s and returns `nextNumber` to continue.
+- `CopyHmiScreens`: make a numbered series of WinCC Unified screens from one screen (`%n%`/`%n2%`/`%n3%` placeholders in name and replace rules, optional `screenNumberStart`). One transaction per screen, existing names are skipped, stops after ~40 s and returns `nextNumber` to continue. A continued call reuses the source snapshot for 10 minutes, and copies after the first skip re-reading the attribute values a fresh copy starts with; the reply reports `snapshotSeconds`/`secondsPerScreen`.
 - __HMI event scripts readable__: `GetHmiScreenItems` gets `includeScripts` (default true) and returns the
   event handler scripts of each item (`events`: eventType, scriptCode, ...), the screen's own event scripts
   (`screenEvents`) and the code of script dynamizations (`dynamizations[].scriptCode`). Added fields only;

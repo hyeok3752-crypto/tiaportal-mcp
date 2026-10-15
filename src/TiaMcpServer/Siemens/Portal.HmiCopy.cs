@@ -105,7 +105,7 @@ namespace TiaMcpServer.Siemens
 
                     var sourceScreen = RequireHmiScreen(hmi, source.Name);
                     var screens = ScreensHolding(hmi, sourceScreen);
-                    var writer = new CopyWriter(replacements);
+                    var writer = new CopyWriter(replacements, source.TargetDefaults);
 
                     try
                     {
@@ -366,7 +366,13 @@ namespace TiaMcpServer.Siemens
         {
             private readonly IReadOnlyList<KeyValuePair<string, string>> _replacements;
 
-            public CopyWriter(IReadOnlyList<KeyValuePair<string, string>> replacements) => _replacements = replacements;
+            private readonly Dictionary<string, object?> _defaults;
+
+            public CopyWriter(IReadOnlyList<KeyValuePair<string, string>> replacements, Dictionary<string, object?> defaults)
+            {
+                _replacements = replacements;
+                _defaults = defaults;
+            }
 
             public string Step { get; set; } = string.Empty;
             public int Items { get; set; }
@@ -415,7 +421,15 @@ namespace TiaMcpServer.Siemens
                     Step = $"{where}.{pair.Key}";
                     var value = Replace(pair.Value);
 
-                    if (!Equals(target.GetAttribute(pair.Key), value))
+                    // Every copy of one snapshot creates the same objects and writes in the same order, so the value
+                    // a fresh object has here is the same each time: read it on the first copy, reuse it after
+                    if (!_defaults.TryGetValue(Step, out var current))
+                    {
+                        current = target.GetAttribute(pair.Key);
+                        _defaults[Step] = current;
+                    }
+
+                    if (!Equals(current, value))
                     {
                         target.SetAttribute(pair.Key, value);
                         Attributes++;
@@ -550,6 +564,9 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>What could not be read and is therefore not copied.</summary>
         public List<string> Skipped { get; } = new List<string>();
+
+        /// <summary>Attribute values a freshly created copy has before they are written (see CopyWriter), filled by the first copy.</summary>
+        public Dictionary<string, object?> TargetDefaults { get; } = new Dictionary<string, object?>(StringComparer.Ordinal);
     }
 
     public class HmiUiSnapshot

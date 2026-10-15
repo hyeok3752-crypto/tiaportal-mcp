@@ -12,6 +12,13 @@ namespace TiaMcpServer.ModelContextProtocol
         /// <summary>Set when the call stopped early: pass it as 'from' to continue.</summary>
         public int? NextNumber { get; set; }
 
+        /// <summary>True when the source was not read again because a call within the last 10 minutes already read it.</summary>
+        public bool? SnapshotReused { get; set; }
+
+        public double? SnapshotSeconds { get; set; }
+
+        public double? SecondsPerScreen { get; set; }
+
         public List<string>? Skipped { get; set; }
 
         /// <summary>Warnings of the first copy that had any (all copies come from the same source).</summary>
