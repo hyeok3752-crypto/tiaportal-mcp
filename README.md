@@ -2,14 +2,37 @@
 
 A MCP server which connects to Siemens TIA Portal.
 
+This is an independent fork of
+[heilingbrunner/tiaportal-mcp](https://github.com/heilingbrunner/tiaportal-mcp) (MIT licensed,
+see [LICENSE.txt](LICENSE.txt)). It started by rebasing onto that project's current structure and
+has since diverged with its own feature set below; it no longer tracks upstream commit-for-commit.
+
 ## Features
 
-- Connect to a TIA Portal instance
+- Connect to a TIA Portal instance, including several instances at once (`GetPortals`/`portalId`)
 - Browse and interact with TIA Portal projects
 - Perform basic project operations from within VS Code
 - Read the full PLC software: program blocks, PLC data types, tags and constants, watch and
   force tables, external source files, and cross references
 - Optionally create, rename, delete, move and import project objects (see [Write mode](#write-mode))
+- Read and write network topology (subnets, IP addresses, PROFINET/PROFIBUS wiring) and compare it
+  against a live PRONETA scan
+- Read and create hardware devices and device groups from the hardware catalog or master copies
+- Export/import the hardware configuration as AutomationML (CAx) for round-tripping with an ECAD
+  tool like EPLAN
+- Read WinCC Unified HMI tag tables, screens, alarms and text lists, and create/edit screens,
+  screen items, faceplates and HMI tags. Classic (non-Unified) WinCC Comfort/Basic panels are not
+  supported by this Openness version - see [Tools](#tools)
+- Connect directly to a live CPU over S7CommPlus (experimental, bypasses Openness entirely) to
+  browse symbols, read/write live tag values and poll active alarms - independent of any open TIA
+  Portal session
+- "Comfort" tools that reduce multi-step workflows to one call: `GetPlcSummary`,
+  `ResolveObjectPath`, `WhereUsed`, `FindInCode` (full-text search across block/type source),
+  `PreviewImport`, `GetBlockSource`/`GetTypeSource`/`GetNetworkSource`, `OpenTiaProject`,
+  `CompareExports` (diff two export folders)
+- `GetState` reports progress for a long-running call (e.g. `FindInCode` on a large PLC) still in
+  flight on the same instance, without waiting for it to finish - useful for telling "still
+  working" apart from "looks stuck"
 
 ## Command Line Arguments
 
@@ -46,7 +69,7 @@ of the MCP server entry in your client's JSON configuration and the model no lon
 
 The server is read-only unless it is started with `--allow-write`.
 
-- Without the flag the 37 project-mutating tools are **not registered at all**, so they never
+- Without the flag the 62 project-mutating tools are **not registered at all**, so they never
   appear in `tools/list`. A model cannot call what it cannot see, and the tool list stays small.
 - With the flag they are registered and annotated `destructiveHint: true`, so a client can still
   prompt before each call.
@@ -55,49 +78,83 @@ The server is read-only unless it is started with `--allow-write`.
 - Write operations change the project **in memory only**. Every write response says so and names
   the tool that persists it: `SaveProject`, or `SaveSession` when a multiuser local session is open.
 
-Export tools are intentionally *not* gated. `ExportXmlBlock`, `ExportXmlTagTable`, `ExportXmlWatchTable`
-and friends only write files on the machine running the server; they never modify the project.
-They are annotated `destructiveHint: true` because they can overwrite files on disk.
+Export tools are intentionally *not* gated. `ExportXmlBlock`, `ExportXmlTagTable`, `ExportXmlWatchTable`,
+`ExportCax` and friends only write files on the machine running the server; they never modify the
+project. They are annotated `destructiveHint: true` because they can overwrite files on disk.
+
+A few other tools also sit outside `--allow-write` because they don't mutate the open project
+either, and gate themselves a different way:
+
+- `CompileSoftware` and `SaveProject`/`SaveAsProject` act on the project but are considered basic
+  operations rather than content edits (this matches upstream's own choice, flagged as an open
+  question - see `TODO.md`).
+- `GoOnline`/`GoOffline` only touch the engineering station's diagnostic connection, never the PLC
+  program; their own description asks the model to confirm with the user before use against a
+  real (non-PLCSIM) PLC.
+- The `*PlcDirect` (S7CommPlus) tools bypass Openness/the project entirely, so `--allow-write`
+  doesn't apply to them. `WritePlcTagValueDirect` instead requires `confirm=true` *and*
+  `confirmPlcSimOnly=true` on every call, and refuses safety-tagged names - see its tool
+  description for the exact rules.
 
 To enable write mode, add the argument to your client configuration, for example
 `"args": ["--allow-write"]`.
 
 ## Tools
 
-Read-only tools (62) are always available.
+149 tools total. Read-only/ungated tools (87) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Portal and state              | `Connect`, `Disconnect`, `GetState`, `Doctor`                                                                                                                                                          |
+| Portal and state              | `Connect`, `Disconnect`, `GetPortals`, `GetState`, `Doctor`                                                                                                                                            |
 | Project and session           | `GetProject`, `OpenProject`, `SaveProject`, `SaveAsProject`, `CloseProject`                                                                                                                            |
-| Devices                       | `GetProjectTree`, `GetDevices`, `GetDeviceInfo`, `GetDeviceItemInfo`                                                                                                                                   |
+| Devices                       | `GetProjectTree`, `GetDevices`, `GetDeviceInfo`, `GetDeviceItemInfo`, `GetGsdDependencies`, `GetDeviceMasterCopies`, `FindHardwareCatalogEntries`                                                     |
+| Network topology              | `GetSubnets`, `GetNetworkInterfaceInfo`                                                                                                                                                               |
+| CAx (AutomationML)            | `ExportCax`                                                                                                                                                                                            |
+| PRONETA                       | `CompareNetworkCsv`                                                                                                                                                                                    |
+| Engineering-station online    | `GetOnlineState`, `GoOnline`, `GoOffline`                                                                                                                                                             |
+| Direct PLC (S7CommPlus, experimental) | `ConnectPlcDirect`, `DisconnectPlcDirect`, `BrowsePlcTagsDirect`, `ReadPlcTagValuesDirect`, `WritePlcTagValueDirect`, `GetActivePlcAlarmsDirect`                                             |
 | PLC software                  | `GetSoftwareInfo`, `GetSoftwareTree`, `CompileSoftware`                                                                                                                                                |
-| Blocks                        | `GetBlocks`, `GetBlockInfo`, `GetBlocksWithHierarchy`, `ExportXmlBlock`, `ExportXmlBlocks`, `ImportXmlBlock`                                                                                           |
+| Blocks                        | `GetBlocks`, `GetBlockInfo`, `GetBlocksWithHierarchy`, `GetBlockInterface`, `ExportXmlBlock`, `ExportXmlBlocks`, `ImportXmlBlock`                                                                      |
 | Types                         | `GetTypes`, `GetTypeInfo`, `ExportXmlType`, `ExportXmlTypes`, `ImportXmlType`                                                                                                                          |
 | Tags and constants            | `GetTagTables`, `GetTagTableInfo`, `GetTags`, `GetTagInfo`, `GetConstants`, `ExportXmlTagTable`                                                                                                        |
 | Watch and force tables        | `GetWatchTables`, `GetWatchTableInfo`, `GetForceTables`, `ExportXmlWatchTable`                                                                                                                         |
-| External sources              | `GetExternalSources`, `GetExternalSourceInfo`, `ExportSourceBlock`, `ExportSourceType`                                                                                                                 |
+| External sources              | `GetExternalSources`, `GetExternalSourceInfo`, `ExportSourceBlock`, `ExportSourceType`, `ExportSourceBlocks`, `ExportSourceTypes`, `ExportSources`                                                    |
 | Cross references              | `GetCrossReferences`                                                                                                                                                                                   |
 | Block documents (V20+)        | `ExportAsDocuments`, `ExportBlocksAsDocuments`, `ImportFromDocuments`, `ImportBlocksFromDocuments`                                                                                                     |
 | Type documents (V21+)         | `ExportTypeAsDocuments`, `ExportTypesAsDocuments`                                                                                                                                                      |
-| Understand and read (comfort) | `GetPlcSummary`, `ResolveObjectPath`, `WhereUsed`, `FindInCode`, `GetBlockSource`, `GetTypeSource`, `GetBlockInterface`, `PreviewImport`, `OpenTiaProject`, `ExportPlcAsDocuments`, `ExportSources` |
+| HMI, WinCC Unified (read)     | `GetHmiTagTables`, `GetHmiTags`, `GetHmiScreens`, `GetHmiScreenItems`, `GetHmiDiscreteAlarms`, `GetHmiAnalogAlarms`, `GetHmiTextLists`                                                                 |
+| Understand and read (comfort) | `GetPlcSummary`, `ResolveObjectPath`, `WhereUsed`, `FindInCode`, `GetBlockSource`, `GetNetworkSource`, `GetTypeSource`, `PreviewImport`, `OpenTiaProject`, `ExportPlcAsDocuments`, `CompareExports`    |
 
-Write tools (44) require `--allow-write`.
+Write tools (62) require `--allow-write` (see [Write mode](#write-mode) for the handful that
+don't, and why).
 
-| Area                  | Tools                                                                                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Block and type groups | `CreateBlockGroup`, `DeleteBlockGroup`, `CreateTypeGroup`, `DeleteTypeGroup`                                                                            |
-| Blocks and types      | `DeleteBlock`, `RenameBlock`, `DeleteType`, `RenameType`, `CreateFB`, `CreateInstanceDB`                                                                |
-| Copy and move         | `CopyBlock`, `MoveBlock`, `CopyType`, `MoveType`                                                                                                        |
-| Tag tables            | `CreateTagTable`, `DeleteTagTable`, `RenameTagTable`, `CreateTagTableGroup`, `DeleteTagTableGroup`, `ImportXmlTagTable`                                    |
-| Tags and constants    | `CreateTag`, `UpdateTag`, `DeleteTag`, `CreateUserConstant`, `UpdateUserConstant`, `DeleteUserConstant`                                                 |
-| Watch tables          | `CreateWatchTable`, `RenameWatchTable`, `DeleteWatchTable`, `CreateWatchTableGroup`, `DeleteWatchTableGroup`, `ImportWatchTable`                        |
-| External sources      | `CreateExternalSourceFromFile`, `DeleteExternalSource`, `CreateExternalSourceGroup`, `DeleteExternalSourceGroup`, `ImportExternalSource`, `ImportSourceBlock`, `ImportSourceType`, `ImportSourceBlocks`, `ImportSourceTypes`, `ImportSources` |
-| Type documents (V21+) | `ImportTypeFromDocuments`, `ImportTypesFromDocuments`                                                                                                   |
+| Area                       | Tools                                                                                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Block and type groups      | `CreateBlockGroup`, `DeleteBlockGroup`, `CreateTypeGroup`, `DeleteTypeGroup`                                                                                                                    |
+| Blocks and types           | `DeleteBlock`, `RenameBlock`, `DeleteType`, `RenameType`, `CreateFB`, `CreateInstanceDB`                                                                                                        |
+| Copy and move              | `CopyBlock`, `MoveBlock`, `CopyType`, `MoveType`                                                                                                                                                |
+| Tag tables                 | `CreateTagTable`, `DeleteTagTable`, `RenameTagTable`, `CreateTagTableGroup`, `DeleteTagTableGroup`, `ImportXmlTagTable`                                                                         |
+| Tags and constants         | `CreateTag`, `UpdateTag`, `DeleteTag`, `CreateUserConstant`, `UpdateUserConstant`, `DeleteUserConstant`                                                                                         |
+| Watch tables                | `CreateWatchTable`, `RenameWatchTable`, `DeleteWatchTable`, `CreateWatchTableGroup`, `DeleteWatchTableGroup`, `ImportWatchTable`                                                                |
+| External sources           | `CreateExternalSourceFromFile`, `DeleteExternalSource`, `CreateExternalSourceGroup`, `DeleteExternalSourceGroup`, `ImportExternalSource`, `ImportSourceBlock`, `ImportSourceType`, `ImportSourceBlocks`, `ImportSourceTypes`, `ImportSources` |
+| Type documents (V21+)      | `ImportTypeFromDocuments`, `ImportTypesFromDocuments`                                                                                                                                           |
+| Devices and network        | `CreateDevice`, `CreateDeviceWithItem`, `DeleteDevice`, `CreateDeviceGroup`, `DeleteDeviceGroup`, `SetIpAddress`, `ConnectToSubnet`, `DisconnectFromSubnet`                                      |
+| CAx (AutomationML)         | `ImportCax`                                                                                                                                                                                     |
+| HMI, WinCC Unified (write) | `CreateHmiScreen`, `DeleteHmiScreen`, `CreateHmiScreenItem`, `UpdateHmiScreenItem`, `DeleteHmiScreenItem`, `BindHmiTag`, `CreateHmiFaceplate`, `SetHmiFaceplateInterface`, `CreateHmiTag`        |
 
 `GetSoftwareTree` accepts a `sections` argument - any comma separated subset of
 `blocks,types,tags,watch,sources`, default `all` - to keep the output small on a large PLC.
-`GetCrossReferences` accepts `maxDepth` (1-3, default 1) for the same reason.
+`GetCrossReferences` accepts `maxDepth` (1-3, default 1) for the same reason. `GetBlocks`/`GetTypes`
+default to `includeAttributes=false` and accept `offset`/`limit` paging and (`GetBlocks` only)
+`modifiedSince`, for the same reason on a large PLC - reading every object's ~30 Openness
+attributes dominates their runtime, so pass `includeAttributes=true` only when you actually need
+them (`GetBlockInfo`/`GetTypeInfo` always return them for a single object).
+
+WinCC Unified HMI tools only work against WinCC Unified devices (Unified Comfort/Advanced panels
+and Unified Runtime); classic, non-Unified WinCC Comfort/Basic panels are not supported by this
+Openness version - see each tool's description. `ConnectPlcDirect` and friends
+bypass Openness/TIA Portal entirely over a reverse-engineered protocol; see their descriptions and
+[Known Limitations](#known-limitations).
 
 Paths used by these tools are **root-relative**: `1_Tests/FC_Block_1`, not
 `Program blocks/1_Tests/FC_Block_1`. Use `GetProjectTree` and `GetSoftwareTree` to discover them.
@@ -198,6 +255,23 @@ group the type already lives in to replace it.
 
 - As of 2025-09-02: Importing Ladder (LAD) blocks from SIMATIC SD documents requires the companion `.s7res` file to contain en-US tags for all items; otherwise import may fail. This is a known limitation/bug in TIA Portal Openness.
  - `ExportXmlBlock` requires a fully qualified `blockPath` like `Group/Subgroup/Name`. If only a name is provided, the tool fails with an error result that may include suggestions for likely full paths.
+- __`GetBlocks`/`GetTypes`/`FindInCode` enumeration cost doesn't shrink with a name filter.__
+  Measured on a ~1000-block project: `GetBlocks` with no filter took ~75s, `GetTypes` ~10s. The
+  regex filter (`regexName`/`nameFilter`) is applied per object only after its name has already
+  been read from Openness, so a narrow filter still pays the cost of walking every object in the
+  PLC - it only shrinks the *result*, not the time the call takes. `FindInCode` additionally
+  exports and reads the source of every matched object, so it can run for minutes on a large,
+  unfiltered PLC. `GetState` reports progress on whichever call is doing this so you can tell it
+  apart from a hang (see [MCP Protocol](#mcp-protocol)); there is no automatic timeout/cancel.
+- __All Openness calls on this server are serialized behind one process-wide lock__
+  (`Operation.Run`), including calls that target *different* TIA Portal instances. A request
+  stuck for a long time on one instance (the point above, or a modal dialog in TIA Portal) can
+  therefore also delay unrelated requests to another attached instance, not just to its own.
+  `GetState`'s busy-timeout message says so when it applies.
+- __The `*PlcDirect` (S7CommPlus) tools are experimental__, built on a reverse-engineered,
+  community-maintained protocol implementation rather than a Siemens-documented one. Prefer
+  pointing them at PLCSIM or a non-critical CPU until proven reliable for your use case; see each
+  tool's own description for firmware/version requirements and safeguards.
 
 ### Limits imposed by the Openness API itself
 
@@ -257,8 +331,13 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 27 read tools and all 37 write tools publish an `outputSchema` and return `structuredContent`.
+- 129 of the 149 tools publish an `outputSchema` and return `structuredContent` (68 of 87
+  read-only, 61 of 62 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
+- Independently of that, `GetState` can report the progress of another call still running on the
+  same TIA Portal instance (tool name, processed/total, current object, time since last progress)
+  without waiting for it to finish - see [Known Limitations](#known-limitations) for why a call
+  can take much longer than it looks like it should.
 - Tool failures are returned as tool results with `isError: true` (not JSON-RPC errors), so the model can read the message and retry.
 
 ## Transports
