@@ -69,7 +69,7 @@ of the MCP server entry in your client's JSON configuration and the model no lon
 
 The server is read-only unless it is started with `--allow-write`.
 
-- Without the flag the 62 project-mutating tools are **not registered at all**, so they never
+- Without the flag the 68 project-mutating tools are **not registered at all**, so they never
   appear in `tools/list`. A model cannot call what it cannot see, and the tool list stays small.
 - With the flag they are registered and annotated `destructiveHint: true`, so a client can still
   prompt before each call.
@@ -101,7 +101,7 @@ To enable write mode, add the argument to your client configuration, for example
 
 ## Tools
 
-149 tools total. Read-only/ungated tools (87) are always available.
+151 tools total. Read-only/ungated tools (83) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -114,18 +114,18 @@ To enable write mode, add the argument to your client configuration, for example
 | Engineering-station online    | `GetOnlineState`, `GoOnline`, `GoOffline`                                                                                                                                                             |
 | Direct PLC (S7CommPlus, experimental) | `ConnectPlcDirect`, `DisconnectPlcDirect`, `BrowsePlcTagsDirect`, `ReadPlcTagValuesDirect`, `WritePlcTagValueDirect`, `GetActivePlcAlarmsDirect`                                             |
 | PLC software                  | `GetSoftwareInfo`, `GetSoftwareTree`, `CompileSoftware`                                                                                                                                                |
-| Blocks                        | `GetBlocks`, `GetBlockInfo`, `GetBlocksWithHierarchy`, `GetBlockInterface`, `ExportXmlBlock`, `ExportXmlBlocks`, `ImportXmlBlock`                                                                      |
-| Types                         | `GetTypes`, `GetTypeInfo`, `ExportXmlType`, `ExportXmlTypes`, `ImportXmlType`                                                                                                                          |
+| Blocks                        | `GetBlocks`, `GetBlockInfo`, `GetBlocksWithHierarchy`, `GetBlockInterface`, `ExportXmlBlock`, `ExportXmlBlocks`                                                                                        |
+| Types                         | `GetTypes`, `GetTypeInfo`, `ExportXmlType`, `ExportXmlTypes`                                                                                                                                           |
 | Tags and constants            | `GetTagTables`, `GetTagTableInfo`, `GetTags`, `GetTagInfo`, `GetConstants`, `ExportXmlTagTable`                                                                                                        |
 | Watch and force tables        | `GetWatchTables`, `GetWatchTableInfo`, `GetForceTables`, `ExportXmlWatchTable`                                                                                                                         |
 | External sources              | `GetExternalSources`, `GetExternalSourceInfo`, `ExportSourceBlock`, `ExportSourceType`, `ExportSourceBlocks`, `ExportSourceTypes`, `ExportSources`                                                    |
 | Cross references              | `GetCrossReferences`                                                                                                                                                                                   |
-| Block documents (V20+)        | `ExportAsDocuments`, `ExportBlocksAsDocuments`, `ImportFromDocuments`, `ImportBlocksFromDocuments`                                                                                                     |
+| Block documents (V20+)        | `ExportAsDocuments`, `ExportBlocksAsDocuments`                                                                                                                                                         |
 | Type documents (V21+)         | `ExportTypeAsDocuments`, `ExportTypesAsDocuments`                                                                                                                                                      |
 | HMI, WinCC Unified (read)     | `GetHmiTagTables`, `GetHmiTags`, `GetHmiScreens`, `GetHmiScreenItems`, `GetHmiDiscreteAlarms`, `GetHmiAnalogAlarms`, `GetHmiTextLists`                                                                 |
 | Understand and read (comfort) | `GetPlcSummary`, `ResolveObjectPath`, `WhereUsed`, `FindInCode`, `GetBlockSource`, `GetNetworkSource`, `GetTypeSource`, `PreviewImport`, `OpenTiaProject`, `ExportPlcAsDocuments`, `CompareExports`    |
 
-Write tools (62) require `--allow-write` (see [Write mode](#write-mode) for the handful that
+Write tools (68) require `--allow-write` (see [Write mode](#write-mode) for the handful that
 don't, and why).
 
 | Area                       | Tools                                                                                                                                                                                          |
@@ -137,10 +137,11 @@ don't, and why).
 | Tags and constants         | `CreateTag`, `UpdateTag`, `DeleteTag`, `CreateUserConstant`, `UpdateUserConstant`, `DeleteUserConstant`                                                                                         |
 | Watch tables                | `CreateWatchTable`, `RenameWatchTable`, `DeleteWatchTable`, `CreateWatchTableGroup`, `DeleteWatchTableGroup`, `ImportWatchTable`                                                                |
 | External sources           | `CreateExternalSourceFromFile`, `DeleteExternalSource`, `CreateExternalSourceGroup`, `DeleteExternalSourceGroup`, `ImportExternalSource`, `ImportSourceBlock`, `ImportSourceType`, `ImportSourceBlocks`, `ImportSourceTypes`, `ImportSources` |
+| Block and type import      | `ImportXmlBlock`, `ImportXmlType`, `ImportFromDocuments`, `ImportBlocksFromDocuments`                                                                                                           |
 | Type documents (V21+)      | `ImportTypeFromDocuments`, `ImportTypesFromDocuments`                                                                                                                                           |
 | Devices and network        | `CreateDevice`, `CreateDeviceWithItem`, `DeleteDevice`, `CreateDeviceGroup`, `DeleteDeviceGroup`, `SetIpAddress`, `ConnectToSubnet`, `DisconnectFromSubnet`                                      |
 | CAx (AutomationML)         | `ImportCax`                                                                                                                                                                                     |
-| HMI, WinCC Unified (write) | `CreateHmiScreen`, `DeleteHmiScreen`, `CreateHmiScreenItem`, `UpdateHmiScreenItem`, `DeleteHmiScreenItem`, `BindHmiTag`, `CreateHmiFaceplate`, `SetHmiFaceplateInterface`, `CreateHmiTag`        |
+| HMI, WinCC Unified (write) | `CreateHmiScreen`, `DeleteHmiScreen`, `CreateHmiScreenItem`, `UpdateHmiScreenItem`, `DeleteHmiScreenItem`, `BindHmiTag`, `CreateHmiFaceplate`, `SetHmiFaceplateInterface`, `CopyHmiScreen`, `CopyHmiScreens`, `CreateHmiTag`        |
 
 `GetSoftwareTree` accepts a `sections` argument - any comma separated subset of
 `blocks,types,tags,watch,sources`, default `all` - to keep the output small on a large PLC.
@@ -331,8 +332,8 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 129 of the 149 tools publish an `outputSchema` and return `structuredContent` (68 of 87
-  read-only, 61 of 62 write).
+- 131 of the 151 tools publish an `outputSchema` and return `structuredContent` (68 of 83
+  read-only, 63 of 68 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
 - Independently of that, `GetState` can report the progress of another call still running on the
   same TIA Portal instance (tool name, processed/total, current object, time since last progress)

@@ -167,12 +167,15 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        [WriteTool]
         [McpServerTool(Name = "ImportXmlType", Title = "Import type from XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Import one PLC data type from an XML file into a type group. An existing type of the same name is replaced")]
         public static ResponseImportXmlType ImportXmlType(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("groupPath: defines the path in the project structure to the group, where to import the type")] string groupPath,
             [Description("importPath: defines the path of the xml file from where to import the type")] string importPath)
         {
+            WritePolicy.EnsureEnabled(nameof(ImportXmlType));
+
             try
             {
                 if (Portal.ImportXmlType(softwarePath, groupPath, importPath))

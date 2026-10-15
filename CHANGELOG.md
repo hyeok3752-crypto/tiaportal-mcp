@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `ImportXmlBlock`, `ImportXmlType`, `ImportFromDocuments` and `ImportBlocksFromDocuments` now need `--allow-write` like every other import tool. They change the project but were registered without it.
+
 ### Added
 
 - `CopyHmiScreens`: make a numbered series of WinCC Unified screens from one screen (`%n%`/`%n2%`/`%n3%` placeholders in name and replace rules, optional `screenNumberStart`). One transaction per screen, existing names are skipped, stops after ~40 s and returns `nextNumber` to continue.
