@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Server instructions in read-only mode now say that the write tools are hidden and that `--allow-write` enables them, so a client can tell the user what to change.
 - `ImportXmlBlock`, `ImportXmlType`, `ImportFromDocuments` and `ImportBlocksFromDocuments` now need `--allow-write` like every other import tool. They change the project but were registered without it.
 
 ### Added

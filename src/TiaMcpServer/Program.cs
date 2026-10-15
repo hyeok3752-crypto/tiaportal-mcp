@@ -156,7 +156,10 @@ namespace TiaMcpServer
                             (WritePolicy.AllowWrite
                                 ? " Write mode is enabled: tools that create, rename or delete project objects are " +
                                   "available. Their changes stay in memory until 'SaveProject' (or 'SaveSession')."
-                                : string.Empty);
+                                : " Read-only mode: the server was started without '--allow-write', so the tools that change " +
+                                  "the project (create, rename, delete, import, HMI screen edits and copies) are not listed. " +
+                                  "If the user asks for such a change, tell them to add \"--allow-write\" to this server's " +
+                                  "args in the MCP client configuration and restart the client.");
                     })
                     .WithStdioServerTransport()
                     .WithRequestFilters(filters =>
