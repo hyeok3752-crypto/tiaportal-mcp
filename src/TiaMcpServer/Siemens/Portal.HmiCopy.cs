@@ -182,6 +182,13 @@ namespace TiaMcpServer.Siemens
                 ("softwarePath", softwarePath), ("source", source.Name), ("newScreenName", newScreenName));
         }
 
+        public bool HmiScreenExists(string softwarePath, string screenName)
+        {
+            return Operation.Run(_logger, nameof(HmiScreenExists), PortalErrorCode.NotFound,
+                () => FindHmiScreen(RequireHmiSoftware(softwarePath), screenName) != null,
+                ("softwarePath", softwarePath), ("screenName", screenName));
+        }
+
         /// <summary>The screen composition (root or a screen group) that holds 'screen', so the copy lands next to it.</summary>
         private static HmiScreenComposition ScreensHolding(HmiSoftware hmi, HmiScreen screen)
         {

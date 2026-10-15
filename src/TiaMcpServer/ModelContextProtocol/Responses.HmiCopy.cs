@@ -2,6 +2,22 @@ using System.Collections.Generic;
 
 namespace TiaMcpServer.ModelContextProtocol
 {
+    public class ResponseHmiScreenCopies : ResponseMessage
+    {
+        public List<string>? Created { get; set; }
+
+        /// <summary>Names of the series that already existed; left untouched.</summary>
+        public List<string>? AlreadyExisted { get; set; }
+
+        /// <summary>Set when the call stopped early: pass it as 'from' to continue.</summary>
+        public int? NextNumber { get; set; }
+
+        public List<string>? Skipped { get; set; }
+
+        /// <summary>Warnings of the first copy that had any (all copies come from the same source).</summary>
+        public List<string>? Warnings { get; set; }
+    }
+
     public class ResponseHmiScreenCopy : ResponseMessage
     {
         public string? ScreenName { get; set; }

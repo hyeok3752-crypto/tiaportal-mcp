@@ -2191,6 +2191,27 @@ Use the CopyHmiScreen tool with these parameters:
 - newScreenName: {newScreenName}{OptionalParameter("replace", replace)}{OptionalParameter("screenNumber", screenNumber)}";
         }
 
+        [McpServerPrompt(Name = "CopyHmiScreens"), Description("Make a numbered series of WinCC Unified screens from one screen")]
+        public static string CopyHmiScreens(string softwarePath, string screenName, string newScreenName, string from, string to, string replace = "", string screenNumberStart = "")
+        {
+            return $@"Make a numbered series of WinCC Unified screens from one screen, e.g. the screens of servo 2..60 from the screen of servo 1. %n% is the number, %n2%/%n3% the number with leading zeros. If the reply has 'nextNumber', call again with from=nextNumber.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: the screen to copy
+- newScreenName: name pattern, e.g. '31%n2% SV1%n2%'
+- from, to: first and last number
+- replace: optional 'from=>to' pairs separated by ';', e.g. 'S{{1}}=>S{{%n%}};Servo_1=>Servo_%n%'
+- screenNumberStart: optional screen number of the first new screen
+
+Use the CopyHmiScreens tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- newScreenName: {newScreenName}
+- from: {from}
+- to: {to}{OptionalParameter("replace", replace)}{OptionalParameter("screenNumberStart", screenNumberStart)}";
+        }
+
         #endregion
 
         #region Compare Templates
