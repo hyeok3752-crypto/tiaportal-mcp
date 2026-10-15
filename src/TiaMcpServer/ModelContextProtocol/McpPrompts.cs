@@ -2248,6 +2248,21 @@ Use the CompareExports tool with these parameters:
 - pathB: {pathB}{OptionalParameter("regexName", regexName)}";
         }
 
+        [McpServerPrompt(Name = "SearchExports"), Description("Search an export folder for a tag, block or comment without TIA Portal")]
+        public static string SearchExports(string path, string text, string useRegex = "", string regexName = "", string maxMatches = "")
+        {
+            return $@"Search the files of an export folder for a tag, block, member or comment text, without TIA Portal. In XML block exports a symbolic access is matched as one path and each match names its network. Results reflect the export date.
+
+Common parameter values:
+- path: the export folder
+- text: e.g. '""G2U1Assy"".PLC_Ins.Pitch', 'Step70' or a comment word
+- regexName: optional regular expression on the file path, e.g. 'G2U1'
+
+Use the SearchExports tool with these parameters:
+- path: {path}
+- text: {text}{OptionalParameter("useRegex", useRegex)}{OptionalParameter("regexName", regexName)}{OptionalParameter("maxMatches", maxMatches)}";
+        }
+
         #endregion
 
         #region Device Write Templates

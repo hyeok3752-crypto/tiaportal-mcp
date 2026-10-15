@@ -9,6 +9,8 @@
 
 ### Added
 
+- `SearchExports`: search an export folder offline for a tag, block, member or comment. In SimaticML a symbolic access split over `<Component>` elements is matched as one path (`"G2U1Assy".PLC_Ins.Pitch`), and each match names its network.
+
 - `CompareHmiScreens`: compare two WinCC Unified screens item by item (items on one side only, differing properties, texts, dynamizations, event scripts, faceplate interface values), with optional `replace` applied to the first screen so a numbered copy can be checked against its pattern.
 
 - `CopyHmiScreens`: make a numbered series of WinCC Unified screens from one screen (`%n%`/`%n2%`/`%n3%` placeholders in name and replace rules, optional `screenNumberStart`). One transaction per screen, existing names are skipped, stops after ~40 s and returns `nextNumber` to continue. A continued call reuses the source snapshot for 10 minutes, and copies after the first skip re-reading the attribute values a fresh copy starts with; the reply reports `snapshotSeconds`/`secondsPerScreen`.
