@@ -2212,6 +2212,23 @@ Use the CopyHmiScreens tool with these parameters:
 - to: {to}{OptionalParameter("replace", replace)}{OptionalParameter("screenNumberStart", screenNumberStart)}";
         }
 
+        [McpServerPrompt(Name = "CompareHmiScreens"), Description("Compare two WinCC Unified screens item by item")]
+        public static string CompareHmiScreens(string softwarePath, string screenName, string otherScreenName, string replace = "", string otherSoftwarePath = "", string maxDifferences = "")
+        {
+            return $@"Compare two WinCC Unified screens item by item. 'replace' is applied to the first screen first, so a numbered copy can be checked against its pattern.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: the reference screen
+- otherScreenName: the screen to compare with it
+- replace: optional 'from=>to' pairs separated by ';', e.g. 'S{{1}}=>S{{2}};Servo_1=>Servo_2'
+
+Use the CompareHmiScreens tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- otherScreenName: {otherScreenName}{OptionalParameter("replace", replace)}{OptionalParameter("otherSoftwarePath", otherSoftwarePath)}{OptionalParameter("maxDifferences", maxDifferences)}";
+        }
+
         #endregion
 
         #region Compare Templates
