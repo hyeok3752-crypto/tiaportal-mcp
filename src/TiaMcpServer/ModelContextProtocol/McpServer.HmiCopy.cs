@@ -67,7 +67,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         [WriteTool]
         [McpServerTool(Name = "CopyHmiScreens", Title = "Copy HMI screen to a series", Destructive = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Make a numbered series of WinCC Unified screens from one screen, e.g. the screens of servo 2..60 from the screen of servo 1. Each copy works like 'CopyHmiScreen'; in 'newScreenName' and 'replace' the placeholder %n% is the number, %n2%/%n3% the number with leading zeros. Each screen is its own transaction. Stops after about 40 s to stay inside the client timeout and returns 'nextNumber' - call again with from=nextNumber to continue. Screens that already exist are skipped, so a repeated call is safe")]
+         Description("Make a numbered series of WinCC Unified screens from one screen, e.g. the screens of servo 2..60 from the screen of servo 1. Each copy works like 'CopyHmiScreen'; in 'newScreenName' and 'replace' the placeholder %n% is the number, %n2%/%n3% the number with leading zeros. Each screen is its own transaction. Stops before a copy that would end after about 40 s, to stay inside the client timeout and returns 'nextNumber' - call again with from=nextNumber to continue. Screens that already exist are skipped, so a repeated call is safe")]
         public static ResponseHmiScreenCopies CopyHmiScreens(
             [Description(HmiPathDescription)] string softwarePath,
             [Description("screenName: the screen to copy, as 'GetHmiScreens' lists it")] string screenName,
@@ -89,6 +89,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
             ParseReplacements(Number(replace, from)); // validate the format once up front
 
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             HmiScreenSnapshot snapshot;
 
             try
@@ -100,7 +101,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 throw new McpException(pex.Message, pex);
             }
 
-            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var longest = TimeSpan.Zero;
             var created = new List<string>();
             var existing = new List<string>();
             var warnings = new List<string>();
@@ -108,7 +109,8 @@ namespace TiaMcpServer.ModelContextProtocol
 
             for (var n = from; n <= to; n++)
             {
-                if (clock.Elapsed > CopyBudget)
+                // stop before a copy that would likely run past the budget (a full servo screen takes ~25 s)
+                if (created.Count > 0 && clock.Elapsed + longest > CopyBudget)
                 {
                     next = n;
                     break;
@@ -125,9 +127,11 @@ namespace TiaMcpServer.ModelContextProtocol
                 var number = screenNumberStart.HasValue ? (ushort?)(screenNumberStart.Value + (n - from)) : null;
                 var replacements = ParseReplacements(Number(replace, n));
 
+                var started = clock.Elapsed;
                 var result = Guarded(nameof(CopyHmiScreens),
                     () => Portal.WriteHmiScreenCopy(softwarePath, snapshot, name, replacements, number));
 
+                longest = TimeSpan.FromTicks(Math.Max(longest.Ticks, (clock.Elapsed - started).Ticks));
                 created.Add(name);
 
                 if (warnings.Count == 0 && result.Warnings.Count > 0)
