@@ -265,8 +265,11 @@ namespace TiaMcpServer.Siemens
                     }
                     catch (Exception ex)
                     {
+                        var reason = Operation.DescribeChain(ex);
+
                         throw new PortalException(PortalErrorCode.ImportFailed,
-                            $"TIA Portal rejected the block import from '{importPath}': {Operation.DescribeChain(ex)}" +
+                            $"TIA Portal rejected the block import from '{importPath}': {reason}" +
+                            FlowOrderHint(reason) +
                             (OnlineHint(GetSoftwareContainer(softwarePath)) ?? string.Empty), null, ex);
                     }
 
@@ -280,6 +283,17 @@ namespace TiaMcpServer.Siemens
                 },
                 ("softwarePath", softwarePath), ("groupPath", groupPath), ("importPath", importPath));
         }
+
+        /// <summary>
+        /// Live 2026-10-15: a LAD network with a new contact appended at the end of &lt;Parts&gt; was refused with
+        /// "The elements must be sorted according to the current flow" (on 10-13 the reason was swallowed and
+        /// the 900+ element network was wrongly thought too big). Placing the new part right after the part
+        /// that feeds it, as TIA's own export lists them, imported fine.
+        /// </summary>
+        private static string FlowOrderHint(string reason) =>
+            reason.IndexOf("sorted according to the current flow", StringComparison.OrdinalIgnoreCase) >= 0
+                ? " Hint: in <Parts>, put each added <Part> directly after the part that feeds it (the order TIA's own export uses), not at the end of the list; the UId named in the message is the misplaced element."
+                : string.Empty;
 
         public (List<PlcBlock> Exported, List<string> Failures) ExportXmlBlocks(string softwarePath, string exportPath, string regexName = "", bool preservePath = false)
         {
