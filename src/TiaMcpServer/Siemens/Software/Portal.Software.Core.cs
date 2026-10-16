@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Siemens.Engineering;
 using Siemens.Engineering.Compiler;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
@@ -61,25 +62,7 @@ namespace TiaMcpServer.Siemens
                         ?? throw new PortalException(PortalErrorCode.NotFound,
                             $"No software found at '{softwarePath}'. 'GetProjectTree' lists the valid software paths.");
 
-                    if (!string.IsNullOrEmpty(password))
-                    {
-                        var deviceItem = softwareContainer.Parent as DeviceItem;
-
-                        var admin = deviceItem?.GetService<SafetyAdministration>();
-                        if (admin != null && !admin.IsLoggedOnToSafetyOfflineProgram)
-                        {
-                            SecureString secString = new NetworkCredential("", password).SecurePassword;
-                            try
-                            {
-                                admin.LoginToSafetyOfflineProgram(secString);
-                            }
-                            catch (Exception ex)
-                            {
-                                throw new PortalException(PortalErrorCode.InvalidParams,
-                                    $"Login to the safety offline program failed: {ex.Message}", null, ex);
-                            }
-                        }
-                    }
+                    LoginSafetyOffline(softwareContainer, password);
 
                     if (softwareContainer.Software is not PlcSoftware plcSoftware)
                     {
@@ -87,26 +70,96 @@ namespace TiaMcpServer.Siemens
                             $"'{softwarePath}' is not a PLC software ({softwareContainer.Software?.GetType().Name ?? "no software"}); only PLC software can be compiled here.");
                     }
 
-                    var compileService = plcSoftware.GetService<ICompilable>()
-                        ?? throw new PortalException(PortalErrorCode.NotSupported,
-                            $"TIA Portal offers no compile service for '{softwarePath}'.");
-
-                    try
-                    {
-                        return compileService.Compile();
-                    }
-                    catch (Exception ex)
-                    {
-                        // Live cause (2026-10-13): TIA Portal was online with the PLC, and the
-                        // compile only worked after going offline. Other causes seen: a modal
-                        // dialog open in the TIA Portal UI, or an edit running there.
-                        throw new PortalException(PortalErrorCode.InvalidState,
-                            $"TIA Portal refused to compile '{softwarePath}': {Operation.DescribeChain(ex)}." +
-                            (OnlineHint(softwareContainer) ?? " Check for an open dialog or a running edit in the TIA Portal window."),
-                            null, ex);
-                    }
+                    return Compile(plcSoftware, softwarePath, softwareContainer);
                 },
                 ("softwarePath", softwarePath));
+        }
+
+        /// <summary>
+        /// Compiles one code block (OB, FC, FB or DB) instead of the whole PLC. After a block
+        /// import this is the quick check, without compiling every other block of the PLC.
+        /// Same failure reporting as CompileSoftware.
+        /// </summary>
+        public CompilerResult? CompileCodeBlock(string softwarePath, string blockPath, string password = "")
+        {
+            _logger?.LogInformation($"Compiling block '{blockPath}' in {softwarePath}");
+
+            return Operation.Run(_logger, nameof(CompileCodeBlock), PortalErrorCode.InvalidState,
+                () =>
+                {
+                    if (IsProjectNull())
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal.");
+                    }
+
+                    var softwareContainer = GetSoftwareContainer(softwarePath)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"No software found at '{softwarePath}'. 'GetProjectTree' lists the valid software paths.");
+
+                    LoginSafetyOffline(softwareContainer, password);
+
+                    var block = GetBlock(softwarePath, blockPath)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"No block found at '{blockPath}' in '{softwarePath}'. 'GetBlocks' lists the block paths.");
+
+                    return Compile(block, blockPath, softwareContainer);
+                },
+                ("softwarePath", softwarePath), ("blockPath", blockPath));
+        }
+
+        /// <summary>
+        /// Logs on to the safety offline program when a password is given and the device has
+        /// one; throws with TIA's reason when the login fails.
+        /// </summary>
+        private static void LoginSafetyOffline(SoftwareContainer softwareContainer, string password)
+        {
+            if (string.IsNullOrEmpty(password))
+            {
+                return;
+            }
+
+            var admin = (softwareContainer.Parent as DeviceItem)?.GetService<SafetyAdministration>();
+            if (admin == null || admin.IsLoggedOnToSafetyOfflineProgram)
+            {
+                return;
+            }
+
+            SecureString secString = new NetworkCredential("", password).SecurePassword;
+            try
+            {
+                admin.LoginToSafetyOfflineProgram(secString);
+            }
+            catch (Exception ex)
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"Login to the safety offline program failed: {ex.Message}", null, ex);
+            }
+        }
+
+        /// <summary>
+        /// Runs ICompilable.Compile on the PLC software or on one block. A compile that runs and
+        /// finds errors returns its result; only a refused compile throws.
+        /// </summary>
+        private CompilerResult Compile(IEngineeringServiceProvider target, string targetPath, SoftwareContainer softwareContainer)
+        {
+            var compileService = target.GetService<ICompilable>()
+                ?? throw new PortalException(PortalErrorCode.NotSupported,
+                    $"TIA Portal offers no compile service for '{targetPath}'.");
+
+            try
+            {
+                return compileService.Compile();
+            }
+            catch (Exception ex)
+            {
+                // Live cause (2026-10-13): TIA Portal was online with the PLC, and the
+                // compile only worked after going offline. Other causes seen: a modal
+                // dialog open in the TIA Portal UI, or an edit running there.
+                throw new PortalException(PortalErrorCode.InvalidState,
+                    $"TIA Portal refused to compile '{targetPath}': {Operation.DescribeChain(ex)}." +
+                    (OnlineHint(softwareContainer) ?? " Check for an open dialog or a running edit in the TIA Portal window."),
+                    null, ex);
+            }
         }
 
         /// <summary>

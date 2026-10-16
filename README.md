@@ -85,7 +85,7 @@ project. They are annotated `destructiveHint: true` because they can overwrite f
 A few other tools also sit outside `--allow-write` because they don't mutate the open project
 either, and gate themselves a different way:
 
-- `CompileSoftware` and `SaveProject`/`SaveAsProject` act on the project but are considered basic
+- `CompileSoftware`, `CompileCodeBlock` and `SaveProject`/`SaveAsProject` act on the project but are considered basic
   operations rather than content edits (this matches upstream's own choice, flagged as an open
   question - see `TODO.md`).
 - `GoOnline`/`GoOffline` only touch the engineering station's diagnostic connection, never the PLC
@@ -101,7 +101,7 @@ To enable write mode, add the argument to your client configuration, for example
 
 ## Tools
 
-153 tools total. Read-only/ungated tools (85) are always available.
+154 tools total. Read-only/ungated tools (86) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -113,7 +113,7 @@ To enable write mode, add the argument to your client configuration, for example
 | PRONETA                       | `CompareNetworkCsv`                                                                                                                                                                                    |
 | Engineering-station online    | `GetOnlineState`, `GoOnline`, `GoOffline`                                                                                                                                                             |
 | Direct PLC (S7CommPlus, experimental) | `ConnectPlcDirect`, `DisconnectPlcDirect`, `BrowsePlcTagsDirect`, `ReadPlcTagValuesDirect`, `WritePlcTagValueDirect`, `GetActivePlcAlarmsDirect`                                             |
-| PLC software                  | `GetSoftwareInfo`, `GetSoftwareTree`, `CompileSoftware`                                                                                                                                                |
+| PLC software                  | `GetSoftwareInfo`, `GetSoftwareTree`, `CompileSoftware`, `CompileCodeBlock`                                                                                                                                              |
 | Blocks                        | `GetBlocks`, `GetBlockInfo`, `GetBlocksWithHierarchy`, `GetBlockInterface`, `ExportXmlBlock`, `ExportXmlBlocks`                                                                                        |
 | Types                         | `GetTypes`, `GetTypeInfo`, `ExportXmlType`, `ExportXmlTypes`                                                                                                                                           |
 | Tags and constants            | `GetTagTables`, `GetTagTableInfo`, `GetTags`, `GetTagInfo`, `GetConstants`, `ExportXmlTagTable`                                                                                                        |
@@ -332,7 +332,7 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 133 of the 153 tools publish an `outputSchema` and return `structuredContent` (70 of 85
+- 134 of the 154 tools publish an `outputSchema` and return `structuredContent` (71 of 86
   read-only, 63 of 68 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
 - Independently of that, `GetState` can report the progress of another call still running on the

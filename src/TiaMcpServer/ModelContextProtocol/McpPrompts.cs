@@ -665,6 +665,21 @@ Use the CompileSoftware tool with these parameters:
 - password: {password}";
         }
 
+        [McpServerPrompt(Name = "CompileCodeBlock"), Description("Compile one code block and list its compiler messages")]
+        public static string CompileCodeBlock(string softwarePath, string blockPath, string password = "")
+        {
+            return $@"Compile one code block (OB, FC, FB or DB) instead of the whole PLC, for example right after importing it, and report its compiler messages with the object each belongs to. Warnings are reported as a successful compile with detail; only errors fail the call.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- blockPath: path of the block below 'Program blocks', e.g. '009_Servo/FB_PitchHome_Inch'
+- password: the password to access administration, default: no password
+
+Use the CompileCodeBlock tool with these parameters:
+- softwarePath: {softwarePath}
+- blockPath: {blockPath}{OptionalParameter("password", password)}";
+        }
+
         [McpServerPrompt(Name = "ResolveObjectPath"), Description("Turn a partial object name into the full path other tools need")]
         public static string ResolveObjectPath(string softwarePath, string name, string kind = "any")
         {

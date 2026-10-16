@@ -10,6 +10,8 @@
 
 ### Added
 
+- `CompileCodeBlock`: compile one code block (OB, FC, FB or DB) instead of the whole PLC, for example right after importing it. Same report as `CompileSoftware` (every compiler message, `meta.success` false on errors). Idea taken from upstream's tool of the same name; `CompileSoftware` keeps its name.
+
 - `SearchExports`: search an export folder offline for a tag, block, member or comment. In SimaticML a symbolic access split over `<Component>` elements is matched as one path (`"G2U1Assy".PLC_Ins.Pitch`), and each match names its network.
 
 - `CompareHmiScreens`: compare two WinCC Unified screens item by item (items on one side only, differing properties, texts, dynamizations, event scripts, faceplate interface values), with optional `replace` applied to the first screen so a numbered copy can be checked against its pattern.
