@@ -81,7 +81,7 @@ namespace TiaMcpServer.Siemens
                     var settings = ReadPart(() => admin.Settings, "Settings", info.Warnings);
                     if (settings != null)
                     {
-                        info.Settings["SafetySystemVersion"] = ReadPart(() => Convert.ToString(settings.SafetySystemVersion), "SafetySystemVersion", info.Warnings);
+                        info.Settings["SafetySystemVersion"] = ReadPart(() => settings.SafetySystemVersion?.Value, "SafetySystemVersion", info.Warnings);
                         info.Settings["ActivationOfFChangeHistory"] = ReadPart(() => Convert.ToString(settings.ActivationOfFChangeHistory), "ActivationOfFChangeHistory", info.Warnings);
                         info.Settings["SafetyModeCanBeDisabled"] = ReadPart(() => Convert.ToString(settings.SafetyModeCanBeDisabled), "SafetyModeCanBeDisabled", info.Warnings);
                         info.Settings["CreateDriverInstanceDataBlocksWithoutPrefix"] = ReadPart(() => Convert.ToString(settings.CreateDriverInstanceDataBlocksWithoutPrefix), "CreateDriverInstanceDataBlocksWithoutPrefix", info.Warnings);
