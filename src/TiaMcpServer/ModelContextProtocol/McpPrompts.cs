@@ -2278,6 +2278,59 @@ Use the SearchExports tool with these parameters:
 - text: {text}{OptionalParameter("useRegex", useRegex)}{OptionalParameter("regexName", regexName)}{OptionalParameter("maxMatches", maxMatches)}";
         }
 
+        [McpServerPrompt(Name = "GetSafetyInfo"), Description("Read the safety program status and the F-block signatures")]
+        public static string GetSafetyInfo(string softwarePath, string includeSignatures = "", string groupPath = "", string regexName = "")
+        {
+            return $@"Read the safety program status of an F-CPU without changing anything: password and login state, safety settings, runtime groups and the offline signature of every F-block. Keep 'signatureHash' to see later whether any F-block changed (it is not TIA's F-collective signature).
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- groupPath: optional block group, e.g. '005_Safety', to check only the safety folder
+
+Use the GetSafetyInfo tool with these parameters:
+- softwarePath: {softwarePath}{OptionalParameter("includeSignatures", includeSignatures)}{OptionalParameter("groupPath", groupPath)}{OptionalParameter("regexName", regexName)}";
+        }
+
+        [McpServerPrompt(Name = "GetBlockFingerprints"), Description("Save block fingerprints and later list which blocks changed")]
+        public static string GetBlockFingerprints(string softwarePath, string groupPath = "", string regexName = "", string saveFile = "", string compareFile = "", string maxBlocks = "")
+        {
+            return $@"Read the fingerprints of the program blocks in a group without exporting anything. Save them with 'saveFile'; a later call with that file as 'compareFile' lists the changed, added and removed blocks and which aspect changed (ProgramCode, Interface, Comments, ...).
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- groupPath: optional block group, e.g. '009_Servo'
+- saveFile / compareFile: absolute paths of a JSON file
+
+Use the GetBlockFingerprints tool with these parameters:
+- softwarePath: {softwarePath}{OptionalParameter("groupPath", groupPath)}{OptionalParameter("regexName", regexName)}{OptionalParameter("saveFile", saveFile)}{OptionalParameter("compareFile", compareFile)}{OptionalParameter("maxBlocks", maxBlocks)}";
+        }
+
+        [McpServerPrompt(Name = "CompareSoftware"), Description("Compare a PLC software with the online PLC or another PLC")]
+        public static string CompareSoftware(string softwarePath, string otherSoftwarePath = "", string maxItems = "")
+        {
+            return $@"Compare a PLC software with the connected PLC (default) or with another PLC software in the project using TIA Portal's own compare, and list what differs. Reads only.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- otherSoftwarePath: empty compares with the online PLC
+
+Use the CompareSoftware tool with these parameters:
+- softwarePath: {softwarePath}{OptionalParameter("otherSoftwarePath", otherSoftwarePath)}{OptionalParameter("maxItems", maxItems)}";
+        }
+
+        [McpServerPrompt(Name = "ArchiveProject"), Description("Archive the saved project as a .zap file, e.g. before an import")]
+        public static string ArchiveProject(string targetDirectory, string archiveName = "", string mode = "")
+        {
+            return $@"Write the saved project as a TIA Portal archive into a folder as a backup. The open project stays where it is; unsaved changes must be saved first.
+
+Common parameter values:
+- targetDirectory: absolute folder path
+- mode: 'Compressed' (default) or 'DiscardRestorableDataAndCompressed'
+
+Use the ArchiveProject tool with these parameters:
+- targetDirectory: {targetDirectory}{OptionalParameter("archiveName", archiveName)}{OptionalParameter("mode", mode)}";
+        }
+
         #endregion
 
         #region Device Write Templates

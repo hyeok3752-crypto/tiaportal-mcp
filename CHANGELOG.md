@@ -10,6 +10,14 @@
 
 ### Added
 
+- `GetSafetyInfo`: read-only status of the safety program of an F-CPU: password set and logged on, safety settings, runtime groups and the offline signature of every F-block, plus a hash over all of them to see whether any F-block changed. V20 Openness has no F-collective signature; the hash is our own and labelled as such.
+
+- `GetBlockFingerprints`: read block fingerprints (interface, program code, comments, properties, ...) without exporting; `saveFile` writes them, `compareFile` lists the changed, added and removed blocks and which aspect changed.
+
+- `CompareSoftware`: TIA Portal's own compare of a PLC software with the online PLC or another PLC software; lists the objects that differ or exist on one side only.
+
+- `ArchiveProject`: write the saved project as a .zapXX archive (backup before an import) without moving the open project. Refuses while there are unsaved changes.
+
 - `CompileCodeBlock`: compile one code block (OB, FC, FB or DB) instead of the whole PLC, for example right after importing it. Same report as `CompileSoftware` (every compiler message, `meta.success` false on errors). Idea taken from upstream's tool of the same name; `CompileSoftware` keeps its name.
 
 - `SearchExports`: search an export folder offline for a tag, block, member or comment. In SimaticML a symbolic access split over `<Component>` elements is matched as one path (`"G2U1Assy".PLC_Ins.Pitch`), and each match names its network.
