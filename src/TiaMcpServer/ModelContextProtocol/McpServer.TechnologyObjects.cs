@@ -44,7 +44,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [McpServerTool(Name = "GetTechnologyObjectParameters", Title = "Get technology object parameters", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Read the configuration parameters of one technology object, e.g. an axis: homing, position limits, hardware limit switches, encoder, drive and mechanics settings as name/value pairs (the offline project values). Filter with 'regexName', e.g. 'Homing|PositionLimits'. Reads only")]
+         Description("Read the configuration parameters of one technology object, e.g. an axis: homing, position limits, hardware limit switches, encoder, drive and mechanics settings as name/value pairs (the offline project values). Address parameters show the assigned PLC tag as 'Name (%I10.0)'; an unassigned one has no value. Filter with 'regexName', e.g. 'Homing|PositionLimits'. Reads only")]
         public static ResponseTechnologyObjectParameters GetTechnologyObjectParameters(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("objectPath: name or group path of the technology object, as listed by 'GetTechnologyObjects'")] string objectPath,
@@ -108,7 +108,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("objectPath: name or group path of the technology object, as listed by 'GetTechnologyObjects'")] string objectPath,
             [Description("parameterName: exact parameter name as listed by 'GetTechnologyObjectParameters', e.g. 'Homing.Mode'")] string parameterName,
-            [Description("value: new value as text, e.g. 'true', '2' or '12.5' ('.' as decimal separator)")] string value)
+            [Description("value: new value as text, e.g. 'true', '2' or '12.5' ('.' as decimal separator); for an address parameter (name ends in 'Address') the name of a PLC tag")] string value)
         {
             return Guarded(nameof(SetTechnologyObjectParameter), () =>
             {

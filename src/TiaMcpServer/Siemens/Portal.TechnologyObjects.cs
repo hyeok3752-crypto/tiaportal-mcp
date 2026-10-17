@@ -1,4 +1,6 @@
+using Siemens.Engineering;
 using Siemens.Engineering.SW;
+using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.TechnologicalObjects;
 using System;
 using System.Collections.Generic;
@@ -161,7 +163,12 @@ namespace TiaMcpServer.Siemens
                             $"Technology object '{match.Path}' has no parameter '{parameterName}'. 'GetTechnologyObjectParameters' lists the names (case-sensitive).");
 
                     var current = parameter.Value;
-                    var converted = ConvertParameterValue(value, current, parameterName);
+
+                    // Address parameters (e.g. _Sensor[1].ActiveHoming.DigitalInputAddress,
+                    // _PositionLimits_HW.MinSwitchAddress) hold a PlcTag; take the value as a tag name.
+                    var converted = current is PlcTag || (current == null && parameterName.EndsWith("Address", StringComparison.Ordinal))
+                        ? RequirePlcTagByName(GetPlcSoftwareOrThrow(softwarePath), value)
+                        : ConvertParameterValue(value, current, parameterName);
 
                     try
                     {
@@ -176,6 +183,38 @@ namespace TiaMcpServer.Siemens
                     return (match.Path, FormatParameterValue(current), FormatParameterValue(parameter.Value));
                 },
                 ("softwarePath", softwarePath), ("objectPath", objectPath), ("parameterName", parameterName));
+        }
+
+        private static PlcTag RequirePlcTagByName(PlcSoftware plcSoftware, string name)
+        {
+            var wanted = (name ?? string.Empty).Trim().Trim('"');
+
+            return FindPlcTag(plcSoftware.TagTableGroup, wanted)
+                ?? throw new PortalException(PortalErrorCode.NotFound,
+                    $"No PLC tag named '{wanted}' in any tag table. This parameter takes a PLC tag; 'GetTags' lists them.");
+        }
+
+        private static PlcTag? FindPlcTag(PlcTagTableGroup group, string name)
+        {
+            foreach (var table in group.TagTables)
+            {
+                var tag = table.Tags.Find(name);
+                if (tag != null)
+                {
+                    return tag;
+                }
+            }
+
+            foreach (var subGroup in group.Groups)
+            {
+                var tag = FindPlcTag(subGroup, name);
+                if (tag != null)
+                {
+                    return tag;
+                }
+            }
+
+            return null;
         }
 
         private static object ConvertParameterValue(string text, object? current, string parameterName)
@@ -259,10 +298,46 @@ namespace TiaMcpServer.Siemens
             {
                 null => null,
                 string text => text,
+                PlcTag tag => FormatTag(tag),
                 bool flag => flag ? "true" : "false",
                 IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+                IEngineeringObject engineeringObject => FormatEngineeringObject(engineeringObject),
                 _ => value.ToString()
             };
+        }
+
+        /// <summary>A tag-valued parameter as "Name (%I10.0)", the way the TIA function view shows it.</summary>
+        private static string FormatTag(PlcTag tag)
+        {
+            string? address = null;
+            try
+            {
+                address = tag.LogicalAddress;
+            }
+            catch (Exception)
+            {
+                // The name alone is still useful.
+            }
+
+            return string.IsNullOrEmpty(address) ? tag.Name : $"{tag.Name} ({address})";
+        }
+
+        /// <summary>Other object-valued parameters (e.g. a connected drive or encoder): their name, not the .NET type.</summary>
+        private static string FormatEngineeringObject(IEngineeringObject engineeringObject)
+        {
+            try
+            {
+                if (engineeringObject.GetAttribute("Name") is string name && name.Length > 0)
+                {
+                    return $"{name} ({engineeringObject.GetType().Name})";
+                }
+            }
+            catch (Exception)
+            {
+                // No Name attribute on this kind of object.
+            }
+
+            return engineeringObject.GetType().Name;
         }
     }
 }
