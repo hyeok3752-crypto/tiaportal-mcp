@@ -2331,6 +2331,50 @@ Use the ArchiveProject tool with these parameters:
 - targetDirectory: {targetDirectory}{OptionalParameter("archiveName", archiveName)}{OptionalParameter("mode", mode)}";
         }
 
+        [McpServerPrompt(Name = "GetTechnologyObjects"), Description("List the technology objects (axes, encoders, PID, ...) of a PLC")]
+        public static string GetTechnologyObjects(string softwarePath, string regexName = "")
+        {
+            return $@"List the technology objects of a PLC software with their type and version. They are not program blocks, so the block tools do not show them.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+
+Use the GetTechnologyObjects tool with these parameters:
+- softwarePath: {softwarePath}{OptionalParameter("regexName", regexName)}";
+        }
+
+        [McpServerPrompt(Name = "GetTechnologyObjectParameters"), Description("Read the parameters of a technology object, e.g. axis homing")]
+        public static string GetTechnologyObjectParameters(string softwarePath, string objectPath, string regexName = "", string maxParameters = "")
+        {
+            return $@"Read the configuration parameters of one technology object, e.g. the homing, limit switch, encoder or mechanics settings of an axis. Reads only.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- objectPath: name of the technology object from GetTechnologyObjects
+- regexName: e.g. 'Homing|PositionLimits'
+
+Use the GetTechnologyObjectParameters tool with these parameters:
+- softwarePath: {softwarePath}
+- objectPath: {objectPath}{OptionalParameter("regexName", regexName)}{OptionalParameter("maxParameters", maxParameters)}";
+        }
+
+        [McpServerPrompt(Name = "SetTechnologyObjectParameter"), Description("Change one parameter of a technology object, e.g. axis homing")]
+        public static string SetTechnologyObjectParameter(string softwarePath, string objectPath, string parameterName, string value)
+        {
+            return $@"Change one configuration parameter of a technology object in the offline project. Read the current value first with GetTechnologyObjectParameters; the change reaches the PLC only after compile and download.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- objectPath: name of the technology object from GetTechnologyObjects
+- parameterName: exact name, e.g. 'Homing.Mode'
+
+Use the SetTechnologyObjectParameter tool with these parameters:
+- softwarePath: {softwarePath}
+- objectPath: {objectPath}
+- parameterName: {parameterName}
+- value: {value}";
+        }
+
         #endregion
 
         #region Device Write Templates

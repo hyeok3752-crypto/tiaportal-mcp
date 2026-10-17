@@ -101,7 +101,7 @@ To enable write mode, add the argument to your client configuration, for example
 
 ## Tools
 
-158 tools total. Read-only/ungated tools (90) are always available.
+161 tools total. Read-only/ungated tools (92) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -114,6 +114,7 @@ To enable write mode, add the argument to your client configuration, for example
 | Engineering-station online    | `GetOnlineState`, `GoOnline`, `GoOffline`                                                                                                                                                             |
 | Direct PLC (S7CommPlus, experimental) | `ConnectPlcDirect`, `DisconnectPlcDirect`, `BrowsePlcTagsDirect`, `ReadPlcTagValuesDirect`, `WritePlcTagValueDirect`, `GetActivePlcAlarmsDirect`                                             |
 | PLC software                  | `GetSoftwareInfo`, `GetSoftwareTree`, `CompileSoftware`, `CompileCodeBlock`, `CompareSoftware`, `GetBlockFingerprints`, `GetSafetyInfo`                                                                                                                                            |
+| Technology objects            | `GetTechnologyObjects`, `GetTechnologyObjectParameters`                                                                                                                                              |
 | Blocks                        | `GetBlocks`, `GetBlockInfo`, `GetBlocksWithHierarchy`, `GetBlockInterface`, `ExportXmlBlock`, `ExportXmlBlocks`                                                                                        |
 | Types                         | `GetTypes`, `GetTypeInfo`, `ExportXmlType`, `ExportXmlTypes`                                                                                                                                           |
 | Tags and constants            | `GetTagTables`, `GetTagTableInfo`, `GetTags`, `GetTagInfo`, `GetConstants`, `ExportXmlTagTable`                                                                                                        |
@@ -125,7 +126,7 @@ To enable write mode, add the argument to your client configuration, for example
 | HMI, WinCC Unified (read)     | `GetHmiTagTables`, `GetHmiTags`, `GetHmiScreens`, `GetHmiScreenItems`, `GetHmiDiscreteAlarms`, `GetHmiAnalogAlarms`, `GetHmiTextLists`, `CompareHmiScreens`                                                                 |
 | Understand and read (comfort) | `GetPlcSummary`, `ResolveObjectPath`, `WhereUsed`, `FindInCode`, `GetBlockSource`, `GetNetworkSource`, `GetTypeSource`, `PreviewImport`, `OpenTiaProject`, `ExportPlcAsDocuments`, `CompareExports`, `SearchExports`    |
 
-Write tools (68) require `--allow-write` (see [Write mode](#write-mode) for the handful that
+Write tools (69) require `--allow-write` (see [Write mode](#write-mode) for the handful that
 don't, and why).
 
 | Area                       | Tools                                                                                                                                                                                          |
@@ -134,6 +135,7 @@ don't, and why).
 | Blocks and types           | `DeleteBlock`, `RenameBlock`, `DeleteType`, `RenameType`, `CreateFB`, `CreateInstanceDB`                                                                                                        |
 | Copy and move              | `CopyBlock`, `MoveBlock`, `CopyType`, `MoveType`                                                                                                                                                |
 | Tag tables                 | `CreateTagTable`, `DeleteTagTable`, `RenameTagTable`, `CreateTagTableGroup`, `DeleteTagTableGroup`, `ImportXmlTagTable`                                                                         |
+| Technology objects         | `SetTechnologyObjectParameter`                                                                                                                                                                   |
 | Tags and constants         | `CreateTag`, `UpdateTag`, `DeleteTag`, `CreateUserConstant`, `UpdateUserConstant`, `DeleteUserConstant`                                                                                         |
 | Watch tables                | `CreateWatchTable`, `RenameWatchTable`, `DeleteWatchTable`, `CreateWatchTableGroup`, `DeleteWatchTableGroup`, `ImportWatchTable`                                                                |
 | External sources           | `CreateExternalSourceFromFile`, `DeleteExternalSource`, `CreateExternalSourceGroup`, `DeleteExternalSourceGroup`, `ImportExternalSource`, `ImportSourceBlock`, `ImportSourceType`, `ImportSourceBlocks`, `ImportSourceTypes`, `ImportSources` |
@@ -332,8 +334,8 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 138 of the 158 tools publish an `outputSchema` and return `structuredContent` (75 of 90
-  read-only, 63 of 68 write).
+- 141 of the 161 tools publish an `outputSchema` and return `structuredContent` (77 of 92
+  read-only, 64 of 69 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
 - Independently of that, `GetState` can report the progress of another call still running on the
   same TIA Portal instance (tool name, processed/total, current object, time since last progress)

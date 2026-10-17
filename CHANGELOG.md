@@ -10,6 +10,10 @@
 
 ### Added
 
+- `GetTechnologyObjects`, `GetTechnologyObjectParameters`: list the technology objects (axes, encoders, cams, PID, ...) of a PLC and read one object's configuration parameters as name/value pairs, filterable by name (e.g. `Homing|PositionLimits`). Technology objects are not program blocks, so no other tool showed them.
+
+- `SetTechnologyObjectParameter` (write): change one technology object parameter in the offline project. The text value is converted to the parameter's type; TIA checks the range and refuses read-only parameters. Old and new value are returned.
+
 - `GetSafetyInfo`: read-only status of the safety program of an F-CPU: password set and logged on, safety settings, runtime groups and the offline signature of every F-block, plus a hash over all of them to see whether any F-block changed. V20 Openness has no F-collective signature; the hash is our own and labelled as such.
 
 - `GetBlockFingerprints`: read block fingerprints (interface, program code, comments, properties, ...) without exporting; `saveFile` writes them, `compareFile` lists the changed, added and removed blocks and which aspect changed.
