@@ -78,7 +78,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     Backup = backup.Path,
                     BackupWarning = backup.Warning,
                     Message = $"'{path}' member '{member}' start value changed from {oldValue ?? "empty"} to {newValue ?? "empty"}. " +
-                              $"Compile, then download with reinitialization for the PLC to use it. {SaveHint}" + BackupNote(backup),
+                              $"Compile it ('CompileCodeBlock'; also before the next change, or that change cannot be backed up), then download with reinitialization for the PLC to use it. {SaveHint}" + BackupNote(backup),
                     Meta = OkMeta()
                 };
             });
