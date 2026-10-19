@@ -9,7 +9,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace TiaMcpServer.Siemens
@@ -290,14 +289,15 @@ namespace TiaMcpServer.Siemens
             }
         }
 
-        private static readonly Regex SclIdentifier = new Regex("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
-
-        /// <summary>One interface member as an SCL declaration; Struct members recurse.</summary>
+        /// <summary>
+        /// One interface member as an SCL declaration; Struct members recurse. Names are always
+        /// quoted: members such as "DT" are SCL keywords and break the source unquoted (live 2026-10-19).
+        /// </summary>
         private static void AppendSclDeclaration(StringBuilder source, XElement member, string indent, bool withStartValue)
         {
             var name = (string?)member.Attribute("Name") ?? string.Empty;
             var datatype = (string?)member.Attribute("Datatype") ?? string.Empty;
-            var quoted = SclIdentifier.IsMatch(name) ? name : "\"" + name + "\"";
+            var quoted = "\"" + name + "\"";
 
             if (datatype.EndsWith("Struct", StringComparison.OrdinalIgnoreCase))
             {
