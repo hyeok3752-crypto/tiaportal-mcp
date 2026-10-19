@@ -167,6 +167,13 @@ namespace TiaMcpServer.Siemens
                 // Some members (e.g. inside system types) do not report it.
             }
 
+            // Arrays, structs and UDT instances have no start value of their own (live 2026-10-19:
+            // GetAttribute throws "not supported"); their elements are listed separately.
+            if (!member.GetAttributeInfos().Any(a => a.Name == "StartValue"))
+            {
+                return entry;
+            }
+
             try
             {
                 entry.StartValue = member.GetAttribute("StartValue")?.ToString();
