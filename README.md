@@ -351,6 +351,7 @@ These are not gaps in this server - the underlying API offers no operation for t
 
 ## Contributing
 
+- Rules for this fork (branches, pull requests, adding a tool, testing on a real project) are in `AGENTS.md`; open work is in [docs/BACKLOG.md](docs/BACKLOG.md).
 - See `agents.md` for guidance on working with agentic assistants and the test execution policy (offer to run tests only with explicit user confirmation).
 
 ## Error Handling
