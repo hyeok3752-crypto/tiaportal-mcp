@@ -69,7 +69,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [McpServerTool(Name = "GetCrossReferences", Title = "Get cross references", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Get cross references for a PLC software or for one block, type, tag table, tag or block group inside it. Watch tables, force tables and external sources have no cross references")]
+         Description("Use to see where a tag or block is used, with locations. Get cross references for a PLC software or for one block, type, tag table, tag or block group inside it. Watch tables, force tables and external sources have no cross references")]
         public static ResponseCrossReferences GetCrossReferences(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("objectPath: optional root-relative path of a block, type, tag table, tag or block group; empty targets the whole PLC software")] string objectPath = "",
@@ -234,7 +234,7 @@ namespace TiaMcpServer.ModelContextProtocol
         #region insight
 
         [McpServerTool(Name = "WhereUsed", Title = "Where used", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Answer 'what uses this?' for a tag, block, PLC data type or tag table by name. Resolves the name, picks the right object kind and flattens the cross-reference tree to a plain list of users. Use 'GetCrossReferences' instead when the full nested result or a specific filter is needed")]
+         Description("Use for a quick 'who uses X' by name. Answer 'what uses this?' for a tag, block, PLC data type or tag table by name. Resolves the name, picks the right object kind and flattens the cross-reference tree to a plain list of users. Use 'GetCrossReferences' instead when the full nested result or a specific filter is needed")]
         public static ResponseWhereUsed WhereUsed(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("name: the object to look up, by bare name or by full root-relative path")] string name,

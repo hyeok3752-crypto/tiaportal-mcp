@@ -77,7 +77,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [McpServerTool(Name = "CompileCodeBlock", Title = "Compile code block", Destructive = false, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Compile one code block (OB, FC, FB or DB) instead of the whole PLC, for example right after importing it, and report its compiler messages like 'CompileSoftware' does. Warnings are reported as a successful compile with detail; only errors fail the call")]
+         Description("Use after every block change to check it. Compile one code block (OB, FC, FB or DB) instead of the whole PLC, for example right after importing it, and report its compiler messages like 'CompileSoftware' does. Warnings are reported as a successful compile with detail; only errors fail the call")]
         public static ResponseCompileSoftware CompileCodeBlock(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("blockPath: path of the block below 'Program blocks', e.g. '009_Servo/FB_PitchHome_Inch'")] string blockPath,

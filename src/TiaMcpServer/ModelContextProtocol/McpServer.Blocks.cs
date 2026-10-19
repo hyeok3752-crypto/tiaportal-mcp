@@ -62,7 +62,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "GetBlocks", Title = "Get blocks", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("List the program blocks of a PLC software, optionally filtered by a name or regular expression")]
+        [McpServerTool(Name = "GetBlocks", Title = "Get blocks", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Use to find a block's path from its name. List the program blocks of a PLC software, optionally filtered by a name or regular expression")]
         public static ResponseBlocks GetBlocks(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("regexName: defines the name or regular expression to find the block, matched anywhere in the block name ('G3U' also matches G3U10..G3U12; anchor with ^...$ for an exact name). Use empty string (default) to find all")] string regexName = "",
@@ -189,7 +189,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "ExportXmlBlock", Title = "Export block as XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Export one program block as an XML file named after the block into exportPath, below its group folders when preservePath is true. An existing file is replaced; inconsistent blocks are rejected")]
+        [McpServerTool(Name = "ExportXmlBlock", Title = "Export block as XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Use to get a block's full SimaticML, e.g. as the source of a network for 'EditBlockNetwork'; to read code prefer 'GetBlockSource'. Export one program block as an XML file named after the block into exportPath, below its group folders when preservePath is true. An existing file is replaced; inconsistent blocks are rejected")]
         public static ResponseExportXmlBlock ExportXmlBlock(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("blockPath: full path to the block in the project structure, e.g. 'Group/Subgroup/Name' (single names are ambiguous)")] string blockPath,
@@ -329,7 +329,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [WriteTool]
-        [McpServerTool(Name = "ImportXmlBlock", Title = "Import block from XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Import one program block from an XML file into a block group. An existing block of the same name is replaced; its previous XML is saved first and returned as 'backup'")]
+        [McpServerTool(Name = "ImportXmlBlock", Title = "Import block from XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Use to bring in a whole block from XML; to change one network prefer 'EditBlockNetwork'. Import one program block from an XML file into a block group. An existing block of the same name is replaced; its previous XML is saved first and returned as 'backup'")]
         public static ResponseImportXmlBlock ImportXmlBlock(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("groupPath: defines the path in the project structure to the group, where to import the block")] string groupPath,
@@ -603,7 +603,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         [WriteTool]
         [McpServerTool(Name = "EditBlockNetwork", Title = "Replace, insert or delete a network", Destructive = true, Idempotent = false, OpenWorld = false, UseStructuredContent = true),
-         Description("Change one network of a program block without hand-editing the whole block XML: replace or insert a network taken from an XML file (e.g. another block's export) or written as SCL text ('sclFile'), or delete one. LAD/FBD parts are put into the flow order TIA requires and IDs are renumbered; the block is backed up first. Use 'previewFile' to only write the edited block XML. The block must be consistent (compile it first)")]
+         Description("Use to change a block (add, replace or remove a network) instead of editing the whole block XML. Change one network of a program block without hand-editing the whole block XML: replace or insert a network taken from an XML file (e.g. another block's export) or written as SCL text ('sclFile'), or delete one. LAD/FBD parts are put into the flow order TIA requires and IDs are renumbered; the block is backed up first. Use 'previewFile' to only write the edited block XML. The block must be consistent (compile it first)")]
         public static ResponseNetworkEdit EditBlockNetwork(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("blockPath: root-relative path of the block, e.g. 009_Servo/FB_PitchHome_Inch")] string blockPath,

@@ -150,6 +150,19 @@ namespace TiaMcpServer
                             "the local file system of the machine running this server. Every request is independent: " +
                             "when more than one TIA Portal instance is running, call 'GetPortals' and pass the chosen " +
                             "'portalId' to 'Connect' and to every other tool." +
+                            " TIA projects are binary and reachable only through this server, so use these tools rather " +
+                            "than reading project files or writing your own Openness scripts. Task guide: " +
+                            "(1) Start: 'Connect' attaches to the running TIA Portal and picks up the project already open " +
+                            "there ('GetState' shows it); call 'OpenProject' only for a different project, since it closes the " +
+                            "open one. Then 'GetProjectTree' for the software path (e.g. 'PLC_1') and 'GetBlocks' or " +
+                            "'ResolveObjectPath' for block paths. " +
+                            "(2) Understand code: 'GetBlockSource' or 'GetNetworkSource' to read a block, 'FindInCode' to " +
+                            "search code text, 'GetCrossReferences' or 'WhereUsed' for who uses a tag or block, 'GetTags' for " +
+                            "tags, 'GetDbStartValues' for DB contents. " +
+                            "(3) Change code: do not hand-edit and re-import a whole block's XML; use 'EditBlockNetwork' to " +
+                            "replace, insert or delete one network (LAD part order and IDs are handled, SCL via 'sclFile'), " +
+                            "'SetDbStartValue' for one DB start value, then 'CompileCodeBlock'. Compile and import fail while " +
+                            "the device is online in TIA Portal: 'GoOffline' first. Changes stay in memory until 'SaveProject'." +
                             (ToolDefaults.Presets.Count > 0
                                 ? " The server presets " + string.Join(", ", ToolDefaults.Presets.Keys.OrderBy(k => k, StringComparer.Ordinal)) +
                                   ": leave them out of a call to use the preset, pass a value to override it. 'GetState' shows the presets."

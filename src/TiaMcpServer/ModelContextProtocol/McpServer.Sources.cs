@@ -26,7 +26,7 @@ namespace TiaMcpServer.ModelContextProtocol
         #region source
 
         [McpServerTool(Name = "GetBlockSource", Title = "Get block source", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Return the source text of one program block directly, instead of exporting a file and reading it back. 'document' gives readable SCL/LAD/STL (SIMATIC Source Document, V20+); objects TIA Portal cannot represent that way - STL and mixed-language blocks - fall back to XML automatically, and the response says which format was produced")]
+         Description("Use to read what a block does. Return the source text of one program block directly, instead of exporting a file and reading it back. 'document' gives readable SCL/LAD/STL (SIMATIC Source Document, V20+); objects TIA Portal cannot represent that way - STL and mixed-language blocks - fall back to XML automatically, and the response says which format was produced")]
         public static ResponseSourceText GetBlockSource(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("blockPath: root-relative path of the block, e.g. '0_OBs/Main'. Use 'ResolveObjectPath' if you only know the name")] string blockPath,
@@ -40,7 +40,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [McpServerTool(Name = "GetNetworkSource", Title = "Get a block's networks as SCL text", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Read a block's networks (CompileUnits) back as SCL text - for the case 'GetBlockSource' can't cover: a mixed-language block (e.g. a LAD-typed FB with individual SCL networks inside it), where 'document' format falls back to raw XML. Exports to a throwaway temp file internally (nothing written to a caller-visible location) and renders the StructuredText (SCL) XML grammar back into source, including call parameter lists and array indices. LAD/FBD networks come back with isStructuredText=false and text=null - ladder logic is not rendered. There is no write-side counterpart yet.")]
+         Description("Use to read single networks, e.g. of mixed LAD/SCL blocks. Read a block's networks (CompileUnits) back as SCL text - for the case 'GetBlockSource' can't cover: a mixed-language block (e.g. a LAD-typed FB with individual SCL networks inside it), where 'document' format falls back to raw XML. Exports to a throwaway temp file internally (nothing written to a caller-visible location) and renders the StructuredText (SCL) XML grammar back into source, including call parameter lists and array indices. LAD/FBD networks come back with isStructuredText=false and text=null - ladder logic is not rendered. There is no write-side counterpart yet.")]
         public static ResponseNetworkSource GetNetworkSource(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("blockPath: root-relative path of the block, e.g. '0_OBs/Main'. Use 'ResolveObjectPath' if you only know the name")] string blockPath,

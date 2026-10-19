@@ -56,7 +56,7 @@ namespace TiaMcpServer.ModelContextProtocol
         #region portal
 
         [McpServerTool(Name = "Connect", Title = "Connect to TIA Portal", Destructive = false, Idempotent = true, OpenWorld = false),
-         Description("Connect to TIA Portal and return its 'portalId'. Without 'portalId' it attaches to the only running instance, or starts one if none is running; with several running it fails and lists them")]
+         Description("Use first in every session. Connect to TIA Portal and return its 'portalId'. Without 'portalId' it attaches to the only running instance, or starts one if none is running; with several running it fails and lists them")]
         public static ResponseConnect Connect(
             [Description("portalId: process id of the TIA Portal instance to attach to (see 'GetPortals'). Leave empty when at most one instance is running")] int? portalId = null)
         {
@@ -364,7 +364,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "SaveProject", Title = "Save project", Destructive = true, Idempotent = true, OpenWorld = false), Description("Save the current local project or local session")]
+        [McpServerTool(Name = "SaveProject", Title = "Save project", Destructive = true, Idempotent = true, OpenWorld = false), Description("Use only when the user wants the changes kept. Save the current local project or local session")]
         public static ResponseSaveProject SaveProject()
         {
             try
@@ -510,7 +510,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         #region devices
 
-        [McpServerTool(Name = "GetProjectTree", Title = "Get project tree", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Show the structure of the current project or session as a tree of devices, device items, groups and PLC/HMI software. Use it to find the device and software paths other tools expect")]
+        [McpServerTool(Name = "GetProjectTree", Title = "Get project tree", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Use right after Connect to learn the device and software paths (e.g. 'PLC_1'). Show the structure of the current project or session as a tree of devices, device items, groups and PLC/HMI software. Use it to find the device and software paths other tools expect")]
         public static ResponseProjectTree GetProjectTree()
         {
             try

@@ -73,7 +73,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [McpServerTool(Name = "GetTags", Title = "Get tags", ReadOnly = true, OpenWorld = false, UseStructuredContent = true),
-         Description("List PLC tags, either of one tag table or of every tag table of the PLC software, optionally filtered by a regular expression on the tag name")]
+         Description("Use to look up PLC tag names and addresses. List PLC tags, either of one tag table or of every tag table of the PLC software, optionally filtered by a regular expression on the tag name")]
         public static ResponseTags GetTags(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("tagTablePath: optional root-relative tag table path; empty searches every tag table")] string tagTablePath = "",

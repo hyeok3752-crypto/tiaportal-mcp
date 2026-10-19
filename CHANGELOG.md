@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Server instructions now carry a short task guide (start, reading code, changing code with `EditBlockNetwork` instead of hand-edited block XML, going offline before compile/import), and the most used tools' descriptions start with one line on when to use them, so clients that see many tools pick the right one. Tool names and arguments are unchanged.
 - `ImportXmlBlock`: when TIA rejects a file because its elements are not "sorted according to the current flow", the error now adds a hint to put each new `<Part>` directly after the part that feeds it. This, not the size of the network, was why a large LAD network failed to import.
 - Server instructions in read-only mode now say that the write tools are hidden and that `--allow-write` enables them, so a client can tell the user what to change.
 - `ImportXmlBlock`, `ImportXmlType`, `ImportFromDocuments` and `ImportBlocksFromDocuments` now need `--allow-write` like every other import tool. They change the project but were registered without it.

@@ -85,7 +85,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         #region hmi screens/alarms/text lists
 
-        [McpServerTool(Name = "GetHmiScreens", Title = "Get HMI screens", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Get a list of screens in a device's HMI software (Unified Comfort/Advanced Panels only)")]
+        [McpServerTool(Name = "GetHmiScreens", Title = "Get HMI screens", ReadOnly = true, OpenWorld = false, UseStructuredContent = true), Description("Use to list the screens of an HMI. Get a list of screens in a device's HMI software (Unified Comfort/Advanced Panels only)")]
         public static ResponseHmiScreens GetHmiScreens(
             [Description("softwarePath: defines the path in the project structure to the HMI device/device item, e.g. 'HMI_1/HMI_RT_1'")] string softwarePath,
             [Description("regexName: defines the name or regular expression to find the screen. Use empty string (default) to find all")] string regexName = "")
