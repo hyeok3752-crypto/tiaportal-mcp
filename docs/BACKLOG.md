@@ -1,11 +1,29 @@
 # Backlog
 
-Open work for this fork, in priority order within each group. Before starting an item, open a draft pull
+Open work for this fork, in priority order within each group. The HMI group (C) comes first right now. Before starting an item, open a draft pull
 request titled with its id (see "Contributing to this fork" in [AGENTS.md](../AGENTS.md)) so nobody else
 picks it up. Remove the item here in the same pull request that finishes it.
 
 Done so far: software checksum (A0), network-level block edit with LAD flow order and SCL text (A1), backup
 before delete or replacing import (A2), DB start values read/write (A3), V21 build switch (part of D12).
+
+## C. HMI (WinCC Unified), alarms, texts - current priority
+
+| Id | Item | Notes |
+| -- | ---- | ----- |
+| C6 | Read and change screen item dynamizations | Which tag, script or flashing drives a property, e.g. which bit changes a lamp's color. `HmiUnified.UI.Dynamization`. Next C item to do. |
+| C1 | Write Unified alarms, alarm classes and text lists | Reading exists already. `HmiUnified.HmiAlarm`, `HmiUnified.TextGraphicList`. |
+| C7 | Read global script modules | The shared functions screen events call; item event scripts are already readable. `HmiUnified.Scripts.HmiScriptModule`. |
+| C8 | Read alarm classes | Color, acknowledgement. `HmiUnified.HmiAlarm.HmiAlarmClass`. Pairs with C1. |
+| C2 | Export/import PLC alarm texts and text lists as xlsx | `SW.Alarm.PlcAlarmTextProvider`, `PlcAlarmTextListProvider`. |
+| C3 | HMI connections, tag acquisition cycles, logging tags | `HmiUnified.HmiConnections`. |
+| C4 | HMI compile result | Check whether `CompileSoftware` already covers HMI software. |
+| C9 | Create and move screen groups | `HmiUnified.UI.ScreenGroup`. |
+| C10 | Data logs, alarm logs, logging tags: read and set | `HmiUnified.HmiLogging`, `LoggingTags`. |
+| C11 | Read runtime settings | Language and font, max logins, OPC UA server, reports. `HmiUnified.RuntimeSettings`. |
+| C12 | Audit trail settings | `HmiLogging.HmiAuditTrail`. |
+| C13 | Read system text lists | `TextGraphicList.HmiSystemTextList`. |
+| C5 | Project text export/import (multilingual) | `ExportProjectTexts`. |
 
 ## A. Most useful next
 
@@ -25,24 +43,6 @@ before delete or replacing import (A2), DB start values read/write (A3), V21 bui
 | B3 | CPU RUN/STOP | Openness has no standalone command; only `StopModules`/`StartModules` inside a download, so it belongs to B1. |
 | B4 | Audit log (JSONL) of every write tool call | Lets a change log be written from what the server actually did. |
 | B5 | Hardware compare (project vs. another PLC or online) | Read-only. `IHardwareCompareTarget`, `CompareTo`. |
-
-## C. HMI (WinCC Unified), alarms, texts
-
-| Id | Item | Notes |
-| -- | ---- | ----- |
-| C6 | Read and change screen item dynamizations | Which tag, script or flashing drives a property, e.g. which bit changes a lamp's color. `HmiUnified.UI.Dynamization`. Next C item to do. |
-| C1 | Write Unified alarms, alarm classes and text lists | Reading exists already. `HmiUnified.HmiAlarm`, `HmiUnified.TextGraphicList`. |
-| C7 | Read global script modules | The shared functions screen events call; item event scripts are already readable. `HmiUnified.Scripts.HmiScriptModule`. |
-| C8 | Read alarm classes | Color, acknowledgement. `HmiUnified.HmiAlarm.HmiAlarmClass`. Pairs with C1. |
-| C2 | Export/import PLC alarm texts and text lists as xlsx | `SW.Alarm.PlcAlarmTextProvider`, `PlcAlarmTextListProvider`. |
-| C3 | HMI connections, tag acquisition cycles, logging tags | `HmiUnified.HmiConnections`. |
-| C4 | HMI compile result | Check whether `CompileSoftware` already covers HMI software. |
-| C9 | Create and move screen groups | `HmiUnified.UI.ScreenGroup`. |
-| C10 | Data logs, alarm logs, logging tags: read and set | `HmiUnified.HmiLogging`, `LoggingTags`. |
-| C11 | Read runtime settings | Language and font, max logins, OPC UA server, reports. `HmiUnified.RuntimeSettings`. |
-| C12 | Audit trail settings | `HmiLogging.HmiAuditTrail`. |
-| C13 | Read system text lists | `TextGraphicList.HmiSystemTextList`. |
-| C5 | Project text export/import (multilingual) | `ExportProjectTexts`. |
 
 ## D. Libraries, motion, other
 
