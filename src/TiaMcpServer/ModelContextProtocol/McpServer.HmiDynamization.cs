@@ -53,5 +53,96 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         #endregion
+
+        #region write
+
+        [WriteTool]
+        [McpServerTool(Name = "SetHmiTagDynamization", Title = "Set HMI tag dynamization", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Use to make a property of a WinCC Unified screen item follow an HMI tag, e.g. a lamp's BackColor green at 0 and red at 1. Binds the tag and, when 'mapping' or 'formula' is given, replaces how tag values map to property values. A property that already has another kind of dynamization (script, flashing) must be cleared with 'DeleteHmiDynamization' first. The previous dynamization is backed up as JSON. Returns the dynamization as read back")]
+        public static ResponseHmiDynamizationWrite SetHmiTagDynamization(
+            [Description(HmiPathDescription)] string softwarePath,
+            [Description("screenName: name of the screen, e.g. '6550 Safety Door'")] string screenName,
+            [Description("itemName: name of the item, e.g. 'Button_9'")] string itemName,
+            [Description("propertyName: the property to dynamize, as named in TIA Portal's property list, e.g. 'BackColor', 'Visible', 'ProcessValue'")] string propertyName,
+            [Description("tagName: the HMI tag, as 'GetHmiTags' lists it, e.g. 'I21085'")] string tagName,
+            [Description("mapping: optional JSON array of range entries from tag value to property value, e.g. '[{\"from\":0,\"to\":0,\"value\":\"#00FF00\"},{\"from\":1,\"to\":1,\"value\":\"#FF0000\"}]'. Leave out 'from' or 'to' for an open range; colors as '#RRGGBB'; optional per entry: flashing (true), alternateValue, flashingRate (Slow, Medium, Fast). '[]' clears the table; empty (default) keeps the current mapping")] string? mapping = null,
+            [Description("formula: optional value converter formula instead of a mapping; empty (default) keeps the current one")] string? formula = null)
+        {
+            return Guarded(nameof(SetHmiTagDynamization), () =>
+            {
+                var result = Portal.SetHmiTagDynamization(softwarePath, screenName, itemName, propertyName, tagName, mapping, formula);
+                return DynamizationWritten(MissingTagWarning(softwarePath, tagName) + $"'{itemName}.{propertyName}' on screen '{screenName}' follows HMI tag '{tagName}'.", result);
+            });
+        }
+
+        [WriteTool]
+        [McpServerTool(Name = "SetHmiScriptDynamization", Title = "Set HMI script dynamization", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Use to compute a property of a WinCC Unified screen item with a script, e.g. a text or color from several tags. Creates the script dynamization or changes its code and trigger. A property that already has another kind of dynamization must be cleared with 'DeleteHmiDynamization' first. The previous dynamization is backed up as JSON. Returns the dynamization as read back")]
+        public static ResponseHmiDynamizationWrite SetHmiScriptDynamization(
+            [Description(HmiPathDescription)] string softwarePath,
+            [Description("screenName: name of the screen, e.g. '6550 Safety Door'")] string screenName,
+            [Description("itemName: name of the item, e.g. 'Button_9'")] string itemName,
+            [Description("propertyName: the property to dynamize, e.g. 'BackColor'")] string propertyName,
+            [Description("scriptCode: the JavaScript body that returns the property value, e.g. 'return Tags(\"I21085\").Read() ? 0xFFFF0000 : 0xFF00FF00;'")] string scriptCode,
+            [Description("triggerType: optional trigger: Disabled, T100ms, T250ms, T500ms, T1s, T2s, T5s, T10s, CustomCycle, Tags or AutomaticTags. Empty (default) keeps the current one")] string? triggerType = null,
+            [Description("triggerTags: optional comma separated HMI tags that trigger the script, e.g. 'I21084,I21085'; implies triggerType 'Tags'")] string? triggerTags = null,
+            [Description("triggerCycle: optional cycle for triggerType 'CustomCycle', as TIA Portal shows it")] string? triggerCycle = null,
+            [Description("globalDefinitionCode: optional code for the script's global definition area; empty (default) keeps it")] string? globalDefinitionCode = null)
+        {
+            return Guarded(nameof(SetHmiScriptDynamization), () =>
+            {
+                var result = Portal.SetHmiScriptDynamization(softwarePath, screenName, itemName, propertyName, scriptCode, triggerType, triggerTags, triggerCycle, globalDefinitionCode);
+                return DynamizationWritten($"'{itemName}.{propertyName}' on screen '{screenName}' is computed by a script.", result);
+            });
+        }
+
+        [WriteTool]
+        [McpServerTool(Name = "SetHmiFlashingDynamization", Title = "Set HMI flashing dynamization", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Use to make a color property of a WinCC Unified screen item flash between two colors. Creates the flashing dynamization or changes it; arguments left empty keep their value. A property that already has another kind of dynamization must be cleared with 'DeleteHmiDynamization' first (a tag mapping entry can flash on its own: see 'SetHmiTagDynamization'). The previous dynamization is backed up as JSON. Returns the dynamization as read back")]
+        public static ResponseHmiDynamizationWrite SetHmiFlashingDynamization(
+            [Description(HmiPathDescription)] string softwarePath,
+            [Description("screenName: name of the screen, e.g. '6550 Safety Door'")] string screenName,
+            [Description("itemName: name of the item, e.g. 'Button_9'")] string itemName,
+            [Description("propertyName: the color property, e.g. 'BackColor'")] string propertyName,
+            [Description("flashingCondition: optional Never, Always or RangeViolation")] string? flashingCondition = null,
+            [Description("flashingRate: optional Slow (0.5 Hz), Medium (1 Hz) or Fast (2 Hz)")] string? flashingRate = null,
+            [Description("color: optional first color, '#RRGGBB' or a name, e.g. '#FF0000'")] string? color = null,
+            [Description("alternateColor: optional second color, e.g. '#FFFF00'")] string? alternateColor = null)
+        {
+            return Guarded(nameof(SetHmiFlashingDynamization), () =>
+            {
+                var result = Portal.SetHmiFlashingDynamization(softwarePath, screenName, itemName, propertyName, flashingCondition, flashingRate, color, alternateColor);
+                return DynamizationWritten($"'{itemName}.{propertyName}' on screen '{screenName}' flashing set.", result);
+            });
+        }
+
+        [WriteTool]
+        [McpServerTool(Name = "DeleteHmiDynamization", Title = "Delete HMI dynamization", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Use to remove the dynamization (tag, script, flashing, ...) of one property of a WinCC Unified screen item; the property keeps its static value. The removed dynamization is returned and backed up as JSON")]
+        public static ResponseHmiDynamizationWrite DeleteHmiDynamization(
+            [Description(HmiPathDescription)] string softwarePath,
+            [Description("screenName: name of the screen, e.g. '6550 Safety Door'")] string screenName,
+            [Description("itemName: name of the item, e.g. 'Button_9'")] string itemName,
+            [Description("propertyName: the dynamized property, e.g. 'BackColor'")] string propertyName)
+        {
+            return Guarded(nameof(DeleteHmiDynamization), () =>
+            {
+                var result = Portal.DeleteHmiDynamization(softwarePath, screenName, itemName, propertyName);
+                return DynamizationWritten($"{result.Previous?.Type} dynamization of '{itemName}.{propertyName}' on screen '{screenName}' deleted.", result);
+            });
+        }
+
+        private static ResponseHmiDynamizationWrite DynamizationWritten(string what, Portal.HmiDynamizationWriteResult result) => new ResponseHmiDynamizationWrite
+        {
+            Message = $"{what} {SaveHint}" + BackupNote(result.Backup),
+            ItemName = result.ItemName,
+            Dynamization = result.Dynamization,
+            Previous = result.Previous,
+            Backup = result.Backup.Path,
+            BackupWarning = result.Backup.Warning,
+            Meta = OkMeta()
+        };
+
+        #endregion
     }
 }

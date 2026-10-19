@@ -258,6 +258,512 @@ namespace TiaMcpServer.Siemens
         private static List<T>? NullIfEmpty<T>(List<T> list) => list.Count == 0 ? null : list;
 
         #endregion
+
+        #region write
+
+        // Every write follows the same order: find the item, parse and convert every argument, back
+        // up the current dynamization of that property, and only then change anything. A failed
+        // Openness call inside the tool's transaction makes TIA Portal refuse the whole commit, so
+        // nothing is tried and retried here.
+
+        public sealed class HmiDynamizationWriteResult
+        {
+            public string ItemName { get; set; } = string.Empty;
+            public HmiDynamizationDetail? Dynamization { get; set; }
+            public HmiDynamizationDetail? Previous { get; set; }
+            public BackupResult Backup { get; set; } = new BackupResult();
+        }
+
+        /// <summary>
+        /// Binds 'tagName' to the property and, when given, replaces the value mapping: 'mapping' is a
+        /// JSON array of range entries ('[]' clears the table), or 'formula' a value converter formula.
+        /// Neither given keeps the current mapping.
+        /// </summary>
+        public HmiDynamizationWriteResult SetHmiTagDynamization(
+            string softwarePath, string screenName, string itemName, string propertyName, string tagName,
+            string? mapping = null, string? formula = null)
+        {
+            return Operation.Run(_logger, nameof(SetHmiTagDynamization), PortalErrorCode.InvalidParams,
+                () =>
+                {
+                    RequireText(propertyName, "propertyName");
+                    RequireText(tagName, "tagName");
+
+                    if (!string.IsNullOrEmpty(mapping) && !string.IsNullOrEmpty(formula))
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, "Pass 'mapping' or 'formula', not both.");
+                    }
+
+                    var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
+                    var existing = RequireReplaceable<TagDynamization>(item, propertyName);
+
+                    var entries = string.IsNullOrEmpty(mapping)
+                        ? null
+                        : ParseRangeMapping(mapping!, PropertyValueType(item, propertyName, existing));
+
+                    var result = Prepare(item, propertyName, existing, nameof(SetHmiTagDynamization), screenName);
+
+                    var dynamization = existing as TagDynamization ?? item.Dynamizations.Create<TagDynamization>(propertyName);
+                    dynamization.Tag = tagName;
+
+                    if (entries != null)
+                    {
+                        var converter = dynamization.ValueConverter;
+                        converter.IsFormulaSelected = false;
+                        var table = converter.MappingTable;
+
+                        foreach (var old in table.Entries.ToList())
+                        {
+                            old.Delete();
+                        }
+
+                        if (entries.Count > 0)
+                        {
+                            table.ConditionType = ConditionType.Range;
+
+                            foreach (var spec in entries)
+                            {
+                                var entry = table.Entries.Create<MappingTableEntryRange>();
+                                if (spec.From != null) entry.From = spec.From;
+                                if (spec.To != null) entry.To = spec.To;
+                                entry.Value = spec.Value;
+
+                                if (spec.Flashing)
+                                {
+                                    entry.Flashing = true;
+                                    if (spec.AlternateValue != null) entry.AlternateValue = spec.AlternateValue;
+                                    if (spec.FlashingRate.HasValue) entry.FlashingRate = spec.FlashingRate.Value;
+                                }
+                            }
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(formula))
+                    {
+                        dynamization.ValueConverter.IsFormulaSelected = true;
+                        dynamization.ValueConverter.Formula = formula;
+                    }
+
+                    return Finish(result, item, propertyName);
+                },
+                ("softwarePath", softwarePath), ("screenName", screenName), ("itemName", itemName), ("propertyName", propertyName));
+        }
+
+        /// <summary>
+        /// Sets the script of a script dynamization, creating it when the property has none.
+        /// Arguments left null keep their current value.
+        /// </summary>
+        public HmiDynamizationWriteResult SetHmiScriptDynamization(
+            string softwarePath, string screenName, string itemName, string propertyName, string scriptCode,
+            string? triggerType = null, string? triggerTags = null, string? triggerCycle = null, string? globalDefinitionCode = null)
+        {
+            return Operation.Run(_logger, nameof(SetHmiScriptDynamization), PortalErrorCode.InvalidParams,
+                () =>
+                {
+                    RequireText(propertyName, "propertyName");
+                    RequireText(scriptCode, "scriptCode");
+
+                    TriggerType? type = string.IsNullOrEmpty(triggerType) ? null : ParseEnum<TriggerType>(triggerType!, "triggerType");
+                    var tags = string.IsNullOrEmpty(triggerTags)
+                        ? null
+                        : triggerTags!.Split(',').Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
+
+                    if (tags != null && type.HasValue && type.Value != TriggerType.Tags)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            $"'triggerTags' go with triggerType 'Tags', not '{type.Value}'.");
+                    }
+
+                    if (!string.IsNullOrEmpty(triggerCycle) && type != TriggerType.CustomCycle)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            "'triggerCycle' goes with triggerType 'CustomCycle'.");
+                    }
+
+                    var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
+                    var existing = RequireReplaceable<ScriptDynamization>(item, propertyName);
+
+                    var result = Prepare(item, propertyName, existing, nameof(SetHmiScriptDynamization), screenName);
+
+                    var dynamization = existing as ScriptDynamization ?? item.Dynamizations.Create<ScriptDynamization>(propertyName);
+                    dynamization.ScriptCode = scriptCode;
+
+                    if (globalDefinitionCode != null)
+                    {
+                        dynamization.GlobalDefinitionAreaScriptCode = globalDefinitionCode;
+                    }
+
+                    if (tags != null)
+                    {
+                        type ??= TriggerType.Tags;
+                    }
+
+                    if (type.HasValue)
+                    {
+                        dynamization.Trigger.Type = type.Value;
+                    }
+
+                    if (tags != null)
+                    {
+                        dynamization.Trigger.Tags = tags;
+                    }
+
+                    if (!string.IsNullOrEmpty(triggerCycle))
+                    {
+                        dynamization.Trigger.CustomDuration = triggerCycle;
+                    }
+
+                    return Finish(result, item, propertyName);
+                },
+                ("softwarePath", softwarePath), ("screenName", screenName), ("itemName", itemName), ("propertyName", propertyName));
+        }
+
+        /// <summary>Sets flashing on a color property, creating the flashing dynamization when there is none.</summary>
+        public HmiDynamizationWriteResult SetHmiFlashingDynamization(
+            string softwarePath, string screenName, string itemName, string propertyName,
+            string? flashingCondition = null, string? flashingRate = null, string? color = null, string? alternateColor = null)
+        {
+            return Operation.Run(_logger, nameof(SetHmiFlashingDynamization), PortalErrorCode.InvalidParams,
+                () =>
+                {
+                    RequireText(propertyName, "propertyName");
+
+                    FlashingCondition? condition = string.IsNullOrEmpty(flashingCondition) ? null : ParseEnum<FlashingCondition>(flashingCondition!, "flashingCondition");
+                    FlashingRate? rate = string.IsNullOrEmpty(flashingRate) ? null : ParseEnum<FlashingRate>(flashingRate!, "flashingRate");
+                    System.Drawing.Color? first = string.IsNullOrEmpty(color) ? null : ParseColor(color!, "color");
+                    System.Drawing.Color? second = string.IsNullOrEmpty(alternateColor) ? null : ParseColor(alternateColor!, "alternateColor");
+
+                    var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
+                    var existing = RequireReplaceable<FlashingDynamization>(item, propertyName);
+
+                    var result = Prepare(item, propertyName, existing, nameof(SetHmiFlashingDynamization), screenName);
+
+                    var dynamization = existing as FlashingDynamization ?? item.Dynamizations.Create<FlashingDynamization>(propertyName);
+
+                    if (condition.HasValue) dynamization.FlashingCondition = condition.Value;
+                    if (rate.HasValue) dynamization.FlashingRate = rate.Value;
+                    if (first.HasValue) dynamization.Color = first.Value;
+                    if (second.HasValue) dynamization.AlternateColor = second.Value;
+
+                    return Finish(result, item, propertyName);
+                },
+                ("softwarePath", softwarePath), ("screenName", screenName), ("itemName", itemName), ("propertyName", propertyName));
+        }
+
+        /// <summary>Removes the dynamization of one property; the property keeps its static value.</summary>
+        public HmiDynamizationWriteResult DeleteHmiDynamization(string softwarePath, string screenName, string itemName, string propertyName)
+        {
+            return Operation.Run(_logger, nameof(DeleteHmiDynamization), PortalErrorCode.DeleteFailed,
+                () =>
+                {
+                    RequireText(propertyName, "propertyName");
+
+                    var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
+                    var existing = item.Dynamizations.Find(propertyName)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"'{itemName}.{propertyName}' on screen '{screenName}' has no dynamization. 'GetHmiDynamizations' lists them.");
+
+                    var result = Prepare(item, propertyName, existing, nameof(DeleteHmiDynamization), screenName);
+
+                    existing.Delete();
+
+                    return result;
+                },
+                ("softwarePath", softwarePath), ("screenName", screenName), ("itemName", itemName), ("propertyName", propertyName));
+        }
+
+        /// <summary>
+        /// The current dynamization of the property, when it may be changed in place: none, or one of
+        /// type T. Another type is refused - the property must be cleared with DeleteHmiDynamization
+        /// first, so a tool never silently swaps e.g. a script for a tag.
+        /// </summary>
+        private static DynamizationBase? RequireReplaceable<T>(HmiScreenItemBase item, string propertyName) where T : DynamizationBase
+        {
+            var existing = item.Dynamizations.Find(propertyName);
+
+            if (existing != null && existing is not T)
+            {
+                throw new PortalException(PortalErrorCode.InvalidState,
+                    $"'{item.Name}.{propertyName}' already has a {existing.DynamizationType} dynamization. " +
+                    "Remove it with 'DeleteHmiDynamization' first if it should be replaced.");
+            }
+
+            return existing;
+        }
+
+        /// <summary>Describes and backs up the current dynamization, before anything changes.</summary>
+        private static HmiDynamizationWriteResult Prepare(HmiScreenItemBase item, string propertyName, DynamizationBase? existing, string toolName, string screenName)
+        {
+            var result = new HmiDynamizationWriteResult { ItemName = item.Name };
+
+            if (existing == null)
+            {
+                return result;
+            }
+
+            result.Previous = DescribeDynamization(existing);
+
+            var objectPath = $"{screenName}/{item.Name}/{propertyName}";
+            var json = System.Text.Json.JsonSerializer.Serialize(
+                new { Screen = screenName, Item = item.Name, Dynamization = result.Previous },
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+            result.Backup = WriteBackup(toolName, objectPath, true, file => System.IO.File.WriteAllText(file.FullName, json), "json");
+
+            return result;
+        }
+
+        private static HmiDynamizationWriteResult Finish(HmiDynamizationWriteResult result, HmiScreenItemBase item, string propertyName)
+        {
+            var current = item.Dynamizations.Find(propertyName);
+            result.Dynamization = current == null ? null : DescribeDynamization(current);
+            return result;
+        }
+
+        private sealed class RangeEntrySpec
+        {
+            public object? From { get; set; }
+            public object? To { get; set; }
+            public object Value { get; set; } = string.Empty;
+            public bool Flashing { get; set; }
+            public object? AlternateValue { get; set; }
+            public FlashingRate? FlashingRate { get; set; }
+        }
+
+        /// <summary>
+        /// Parses '[{"from":0,"to":0,"value":"#00FF00"},{"from":1,"to":1,"value":"#FF0000"}]'.
+        /// 'from'/'to' are tag values (one of them may be left out for an open range); 'value' is
+        /// converted to the property's type; 'flashing', 'alternateValue' and 'flashingRate' are optional.
+        /// </summary>
+        private static List<RangeEntrySpec> ParseRangeMapping(string mapping, Type valueType)
+        {
+            System.Text.Json.JsonDocument document;
+
+            try
+            {
+                document = System.Text.Json.JsonDocument.Parse(mapping);
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"'mapping' is not valid JSON: {ex.Message}. Example: [{{\"from\":0,\"to\":0,\"value\":\"#00FF00\"}},{{\"from\":1,\"to\":1,\"value\":\"#FF0000\"}}]", null, ex);
+            }
+
+            using (document)
+            {
+                if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
+                {
+                    throw new PortalException(PortalErrorCode.InvalidParams, "'mapping' must be a JSON array of entries, or '[]' to clear the table.");
+                }
+
+                var list = new List<RangeEntrySpec>();
+                var index = 0;
+
+                foreach (var element in document.RootElement.EnumerateArray())
+                {
+                    index++;
+
+                    if (element.ValueKind != System.Text.Json.JsonValueKind.Object)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, $"'mapping' entry {index} is not an object.");
+                    }
+
+                    var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "from", "to", "value", "flashing", "alternateValue", "flashingRate" };
+                    var unknown = element.EnumerateObject().Select(p => p.Name).FirstOrDefault(n => !known.Contains(n));
+                    if (unknown != null)
+                    {
+                        throw new PortalException(PortalErrorCode.NotSupported,
+                            $"'mapping' entry {index}: '{unknown}' is not supported. Entries take from, to, value, flashing, alternateValue, flashingRate (range conditions only).");
+                    }
+
+                    var spec = new RangeEntrySpec
+                    {
+                        From = RangeBound(element, "from", index),
+                        To = RangeBound(element, "to", index)
+                    };
+
+                    if (spec.From == null && spec.To == null)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, $"'mapping' entry {index} needs 'from', 'to' or both.");
+                    }
+
+                    var value = JsonText(element, "value")
+                        ?? throw new PortalException(PortalErrorCode.InvalidParams, $"'mapping' entry {index} needs a 'value'.");
+                    spec.Value = ConvertPropertyValue(value, valueType, $"mapping entry {index} 'value'");
+
+                    if (Property(element, "flashing") is { } flashing)
+                    {
+                        spec.Flashing = flashing.ValueKind == System.Text.Json.JsonValueKind.True
+                            || (flashing.ValueKind == System.Text.Json.JsonValueKind.String && bool.TryParse(flashing.GetString(), out var on) && on);
+                    }
+
+                    if (JsonText(element, "alternateValue") is { } alternate)
+                    {
+                        spec.AlternateValue = ConvertPropertyValue(alternate, valueType, $"mapping entry {index} 'alternateValue'");
+                    }
+
+                    if (JsonText(element, "flashingRate") is { } rate)
+                    {
+                        spec.FlashingRate = ParseEnum<FlashingRate>(rate, $"mapping entry {index} 'flashingRate'");
+                    }
+
+                    list.Add(spec);
+                }
+
+                return list;
+            }
+        }
+
+        private static System.Text.Json.JsonElement? Property(System.Text.Json.JsonElement element, string name)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return property.Value;
+                }
+            }
+
+            return null;
+        }
+
+        private static string? JsonText(System.Text.Json.JsonElement element, string name)
+        {
+            var value = Property(element, name);
+
+            return value?.ValueKind switch
+            {
+                null or System.Text.Json.JsonValueKind.Null => null,
+                System.Text.Json.JsonValueKind.String => value.Value.GetString(),
+                _ => value.Value.GetRawText()
+            };
+        }
+
+        /// <summary>Range bounds are stored as Int32 for whole numbers (also for Bool tags), otherwise as Double.</summary>
+        private static object? RangeBound(System.Text.Json.JsonElement element, string name, int index)
+        {
+            var text = JsonText(element, name);
+            if (text == null)
+            {
+                return null;
+            }
+
+            if (bool.TryParse(text, out var flag))
+            {
+                return flag ? 1 : 0;
+            }
+
+            if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var whole))
+            {
+                return whole;
+            }
+
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var real))
+            {
+                return real;
+            }
+
+            throw new PortalException(PortalErrorCode.InvalidParams, $"'mapping' entry {index}: '{name}' value '{text}' is not a number.");
+        }
+
+        /// <summary>
+        /// The .NET type the property's values have (System.Drawing.Color for colors, bool for
+        /// Visible, ...), taken from the item's current value or, failing that, from an existing entry.
+        /// </summary>
+        private static Type PropertyValueType(HmiScreenItemBase item, string propertyName, DynamizationBase? existing)
+        {
+            object? current;
+
+            try
+            {
+                current = item.GetAttribute(propertyName);
+            }
+            catch (Exception ex)
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"A {KindOf(item)} has no property '{propertyName}' (as named in TIA Portal's property list, e.g. 'BackColor', 'Visible'): {Operation.DescribeChain(ex)}", null, ex);
+            }
+
+            var type = current?.GetType()
+                ?? (existing as TagDynamization)?.ValueConverter?.MappingTable?.Entries.Select(e => e.Value?.GetType()).FirstOrDefault(t => t != null);
+
+            if (type == null)
+            {
+                throw new PortalException(PortalErrorCode.NotSupported,
+                    $"Cannot tell the value type of '{item.Name}.{propertyName}' (it has no current value), so 'mapping' values cannot be converted.");
+            }
+
+            if (type != typeof(System.Drawing.Color) && type != typeof(string) && type != typeof(bool) && !type.IsEnum && !type.IsPrimitive)
+            {
+                throw new PortalException(PortalErrorCode.NotSupported,
+                    $"'{item.Name}.{propertyName}' holds {type.Name} values, which a mapping cannot set. Texts change with a resource list in TIA Portal.");
+            }
+
+            return type;
+        }
+
+        private static object ConvertPropertyValue(string text, Type type, string what)
+        {
+            if (type == typeof(System.Drawing.Color))
+            {
+                return ParseColor(text, what);
+            }
+
+            try
+            {
+                if (type == typeof(string)) return text;
+                if (type == typeof(bool)) return text.Trim() == "1" || bool.Parse(text.Trim());
+                if (type.IsEnum) return Enum.Parse(type, text.Trim(), true);
+
+                return Convert.ChangeType(text.Trim(), type, CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is OverflowException || ex is ArgumentException)
+            {
+                var hint = type.IsEnum ? $" One of: {string.Join(", ", Enum.GetNames(type))}." : string.Empty;
+                throw new PortalException(PortalErrorCode.InvalidParams, $"{what}: '{text}' is not a valid {type.Name}.{hint}", null, ex);
+            }
+        }
+
+        /// <summary>'#RRGGBB', '#AARRGGBB' or a color name such as 'Red'.</summary>
+        private static System.Drawing.Color ParseColor(string text, string what)
+        {
+            var value = text.Trim();
+
+            if (value.StartsWith("#", StringComparison.Ordinal)
+                && (value.Length == 7 || value.Length == 9)
+                && uint.TryParse(value.Substring(1), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var argb))
+            {
+                return System.Drawing.Color.FromArgb(value.Length == 7 ? unchecked((int)(0xFF000000 | argb)) : unchecked((int)argb));
+            }
+
+            var named = System.Drawing.Color.FromName(value);
+            if (named.IsKnownColor)
+            {
+                return System.Drawing.Color.FromArgb(named.ToArgb());
+            }
+
+            throw new PortalException(PortalErrorCode.InvalidParams, $"{what}: '{text}' is not a color. Use '#RRGGBB', '#AARRGGBB' or a name such as 'Red'.");
+        }
+
+        private static T ParseEnum<T>(string text, string what) where T : struct
+        {
+            if (Enum.TryParse<T>(text.Trim(), true, out var value) && Enum.IsDefined(typeof(T), value))
+            {
+                return value;
+            }
+
+            throw new PortalException(PortalErrorCode.InvalidParams,
+                $"{what}: '{text}' is not valid. One of: {string.Join(", ", Enum.GetNames(typeof(T)))}.");
+        }
+
+        private static void RequireText(string? value, string name)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams, $"'{name}' is required.");
+            }
+        }
+
+        #endregion
     }
 
     public class HmiItemDynamizations
