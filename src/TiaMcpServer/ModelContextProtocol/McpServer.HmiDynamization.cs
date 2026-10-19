@@ -65,7 +65,7 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("itemName: name of the item, e.g. 'Button_9'")] string itemName,
             [Description("propertyName: the property to dynamize, as named in TIA Portal's property list, e.g. 'BackColor', 'Visible', 'ProcessValue'")] string propertyName,
             [Description("tagName: the HMI tag, as 'GetHmiTags' lists it, e.g. 'I21085'")] string tagName,
-            [Description("mapping: optional JSON array of range entries from tag value to property value, e.g. '[{\"from\":0,\"to\":0,\"value\":\"#00FF00\"},{\"from\":1,\"to\":1,\"value\":\"#FF0000\"}]'. Leave out 'from' or 'to' for an open range; colors as '#RRGGBB'; optional per entry: flashing (true), alternateValue, flashingRate (Slow, Medium, Fast). '[]' clears the table; empty (default) keeps the current mapping")] string? mapping = null,
+            [Description("mapping: optional JSON array of range entries from tag value to property value, e.g. '[{\"from\":0,\"to\":0,\"value\":\"#00FF00\"},{\"from\":1,\"to\":1,\"value\":\"#FF0000\"}]'. 'from' and 'to' are both required (open ranges cannot be written); colors as '#RRGGBB'; optional per entry: flashing (true), alternateValue, flashingRate (Slow, Medium, Fast). '[]' clears the table; empty (default) keeps the current mapping")] string? mapping = null,
             [Description("formula: optional value converter formula instead of a mapping; empty (default) keeps the current one")] string? formula = null)
         {
             return Guarded(nameof(SetHmiTagDynamization), () =>

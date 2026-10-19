@@ -295,7 +295,7 @@ namespace TiaMcpServer.Siemens
                     }
 
                     var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
-                    var existing = RequireReplaceable<TagDynamization>(item, propertyName);
+                    var existing = RequireReplaceable(item, propertyName, DynamizationType.Tag);
 
                     var entries = string.IsNullOrEmpty(mapping)
                         ? null
@@ -308,8 +308,15 @@ namespace TiaMcpServer.Siemens
 
                     if (entries != null)
                     {
+                        // IsFormulaSelected is only written when it changes: a Unified Comfort panel
+                        // refuses the setter even for 'false' ("Property is not supported on current
+                        // device", live 2026-10-19), and that would abort the whole transaction.
                         var converter = dynamization.ValueConverter;
-                        converter.IsFormulaSelected = false;
+                        if (converter.IsFormulaSelected)
+                        {
+                            converter.IsFormulaSelected = false;
+                        }
+
                         var table = converter.MappingTable;
 
                         foreach (var old in table.Entries.ToList())
@@ -324,8 +331,8 @@ namespace TiaMcpServer.Siemens
                             foreach (var spec in entries)
                             {
                                 var entry = table.Entries.Create<MappingTableEntryRange>();
-                                if (spec.From != null) entry.From = spec.From;
-                                if (spec.To != null) entry.To = spec.To;
+                                entry.From = spec.From!;
+                                entry.To = spec.To!;
                                 entry.Value = spec.Value;
 
                                 if (spec.Flashing)
@@ -339,8 +346,17 @@ namespace TiaMcpServer.Siemens
                     }
                     else if (!string.IsNullOrEmpty(formula))
                     {
-                        dynamization.ValueConverter.IsFormulaSelected = true;
-                        dynamization.ValueConverter.Formula = formula;
+                        try
+                        {
+                            dynamization.ValueConverter.IsFormulaSelected = true;
+                            dynamization.ValueConverter.Formula = formula;
+                        }
+                        catch (Exception ex) when (ex is not PortalException)
+                        {
+                            throw new PortalException(PortalErrorCode.NotSupported,
+                                $"TIA Portal refused a formula for '{itemName}.{propertyName}': {Operation.DescribeChain(ex).TrimEnd('.')}. " +
+                                "Some panels support no value converter formula; use 'mapping' or 'SetHmiScriptDynamization' instead.", null, ex);
+                        }
                     }
 
                     return Finish(result, item, propertyName);
@@ -380,7 +396,7 @@ namespace TiaMcpServer.Siemens
                     }
 
                     var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
-                    var existing = RequireReplaceable<ScriptDynamization>(item, propertyName);
+                    var existing = RequireReplaceable(item, propertyName, DynamizationType.Script);
 
                     var result = Prepare(item, propertyName, existing, nameof(SetHmiScriptDynamization), screenName);
 
@@ -433,7 +449,7 @@ namespace TiaMcpServer.Siemens
                     System.Drawing.Color? second = string.IsNullOrEmpty(alternateColor) ? null : ParseColor(alternateColor!, "alternateColor");
 
                     var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
-                    var existing = RequireReplaceable<FlashingDynamization>(item, propertyName);
+                    var existing = RequireReplaceable(item, propertyName, DynamizationType.Flashing);
 
                     var result = Prepare(item, propertyName, existing, nameof(SetHmiFlashingDynamization), screenName);
 
@@ -473,14 +489,17 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>
         /// The current dynamization of the property, when it may be changed in place: none, or one of
-        /// type T. Another type is refused - the property must be cleared with DeleteHmiDynamization
-        /// first, so a tool never silently swaps e.g. a script for a tag.
+        /// the given type. Another type is refused - the property must be cleared with
+        /// DeleteHmiDynamization first, so a tool never silently swaps e.g. a script for a tag.
+        /// Not a generic method constrained to DynamizationBase: a Siemens type in a constraint makes
+        /// loading the Portal class need Siemens.Engineering, and Program.Main touches Portal before
+        /// the Openness assembly resolver is registered.
         /// </summary>
-        private static DynamizationBase? RequireReplaceable<T>(HmiScreenItemBase item, string propertyName) where T : DynamizationBase
+        private static DynamizationBase? RequireReplaceable(HmiScreenItemBase item, string propertyName, DynamizationType type)
         {
             var existing = item.Dynamizations.Find(propertyName);
 
-            if (existing != null && existing is not T)
+            if (existing != null && existing.DynamizationType != type)
             {
                 throw new PortalException(PortalErrorCode.InvalidState,
                     $"'{item.Name}.{propertyName}' already has a {existing.DynamizationType} dynamization. " +
@@ -505,7 +524,12 @@ namespace TiaMcpServer.Siemens
             var objectPath = $"{screenName}/{item.Name}/{propertyName}";
             var json = System.Text.Json.JsonSerializer.Serialize(
                 new { Screen = screenName, Item = item.Name, Dynamization = result.Previous },
-                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                });
 
             result.Backup = WriteBackup(toolName, objectPath, true, file => System.IO.File.WriteAllText(file.FullName, json), "json");
 
@@ -531,8 +555,8 @@ namespace TiaMcpServer.Siemens
 
         /// <summary>
         /// Parses '[{"from":0,"to":0,"value":"#00FF00"},{"from":1,"to":1,"value":"#FF0000"}]'.
-        /// 'from'/'to' are tag values (one of them may be left out for an open range); 'value' is
-        /// converted to the property's type; 'flashing', 'alternateValue' and 'flashingRate' are optional.
+        /// 'from'/'to' are tag values, both required; 'value' is converted to the property's type;
+        /// 'flashing', 'alternateValue' and 'flashingRate' are optional.
         /// </summary>
         private static List<RangeEntrySpec> ParseRangeMapping(string mapping, Type valueType)
         {
@@ -581,9 +605,12 @@ namespace TiaMcpServer.Siemens
                         To = RangeBound(element, "to", index)
                     };
 
-                    if (spec.From == null && spec.To == null)
+                    // Both bounds: MappingTableEntryRange.RangeType is read-only and stays 'Range', so an
+                    // entry with one bound would silently get 0 as the other (live 2026-10-19).
+                    if (spec.From == null || spec.To == null)
                     {
-                        throw new PortalException(PortalErrorCode.InvalidParams, $"'mapping' entry {index} needs 'from', 'to' or both.");
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            $"'mapping' entry {index} needs both 'from' and 'to'; for a single value give it twice, e.g. \"from\":1,\"to\":1. Open ranges cannot be written.");
                     }
 
                     var value = JsonText(element, "value")
