@@ -100,7 +100,7 @@ either, and gate themselves a different way:
 To enable write mode, add the argument to your client configuration, for example
 `"args": ["--allow-write"]`.
 
-Before `DeleteBlock`, `DeleteType`, and an `ImportXmlBlock`/`ImportXmlType` that replaces an
+Before `DeleteBlock`, `DeleteType`, `EditBlockNetwork`, and an `ImportXmlBlock`/`ImportXmlType` that replaces an
 object of the same name, the current object is exported as XML to
 `<backup path>\<yyyyMMdd>\<time>_<tool>_<object>.xml` and the reply names the file (`backup`).
 Re-importing that file restores the old version even after the project was saved. An object TIA
@@ -108,7 +108,7 @@ will not export (inconsistent) is changed anyway and the reply says why there is
 
 ## Tools
 
-162 tools total. Read-only/ungated tools (93) are always available.
+163 tools total. Read-only/ungated tools (93) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -133,13 +133,13 @@ will not export (inconsistent) is changed anyway and the reply says why there is
 | HMI, WinCC Unified (read)     | `GetHmiTagTables`, `GetHmiTags`, `GetHmiScreens`, `GetHmiScreenItems`, `GetHmiDiscreteAlarms`, `GetHmiAnalogAlarms`, `GetHmiTextLists`, `CompareHmiScreens`                                                                 |
 | Understand and read (comfort) | `GetPlcSummary`, `ResolveObjectPath`, `WhereUsed`, `FindInCode`, `GetBlockSource`, `GetNetworkSource`, `GetTypeSource`, `PreviewImport`, `OpenTiaProject`, `ExportPlcAsDocuments`, `CompareExports`, `SearchExports`    |
 
-Write tools (69) require `--allow-write` (see [Write mode](#write-mode) for the handful that
+Write tools (70) require `--allow-write` (see [Write mode](#write-mode) for the handful that
 don't, and why).
 
 | Area                       | Tools                                                                                                                                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Block and type groups      | `CreateBlockGroup`, `DeleteBlockGroup`, `CreateTypeGroup`, `DeleteTypeGroup`                                                                                                                    |
-| Blocks and types           | `DeleteBlock`, `RenameBlock`, `DeleteType`, `RenameType`, `CreateFB`, `CreateInstanceDB`                                                                                                        |
+| Blocks and types           | `EditBlockNetwork`, `DeleteBlock`, `RenameBlock`, `DeleteType`, `RenameType`, `CreateFB`, `CreateInstanceDB`                                                                                                        |
 | Copy and move              | `CopyBlock`, `MoveBlock`, `CopyType`, `MoveType`                                                                                                                                                |
 | Tag tables                 | `CreateTagTable`, `DeleteTagTable`, `RenameTagTable`, `CreateTagTableGroup`, `DeleteTagTableGroup`, `ImportXmlTagTable`                                                                         |
 | Technology objects         | `SetTechnologyObjectParameter`                                                                                                                                                                   |
@@ -341,8 +341,8 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 142 of the 162 tools publish an `outputSchema` and return `structuredContent` (78 of 93
-  read-only, 64 of 69 write).
+- 143 of the 163 tools publish an `outputSchema` and return `structuredContent` (78 of 93
+  read-only, 65 of 70 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
 - Independently of that, `GetState` can report the progress of another call still running on the
   same TIA Portal instance (tool name, processed/total, current object, time since last progress)

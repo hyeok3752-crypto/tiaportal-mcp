@@ -22,6 +22,26 @@ namespace TiaMcpServer.ModelContextProtocol
         public string? Path { get; set; }
     }
 
+    public class ResponseNetworkEdit : ResponseMessage
+    {
+        public string BlockPath { get; set; } = string.Empty;
+        public string Action { get; set; } = string.Empty;
+        public int NetworkIndex { get; set; }
+        public int NetworksBefore { get; set; }
+        public int NetworksAfter { get; set; }
+
+        /// <summary>LAD/FBD parts of the new network moved into TIA's flow order.</summary>
+        public int PartsReordered { get; set; }
+
+        /// <summary>XML export of the block taken just before the import.</summary>
+        public string? Backup { get; set; }
+
+        public string? BackupWarning { get; set; }
+
+        /// <summary>With 'previewFile': where the edited block XML was written (nothing imported).</summary>
+        public string? PreviewFile { get; set; }
+    }
+
     public class ResponseDeleted : ResponseMessage
     {
         public string? Kind { get; set; }

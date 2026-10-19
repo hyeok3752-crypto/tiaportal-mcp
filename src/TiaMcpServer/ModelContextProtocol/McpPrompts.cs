@@ -885,6 +885,24 @@ Use the DeleteBlockGroup tool with these parameters:
 - groupPath: {groupPath}";
         }
 
+        [McpServerPrompt(Name = "EditBlockNetwork"), Description("Replace, insert or delete one network of a program block")]
+        public static string EditBlockNetwork(string softwarePath, string blockPath, string action, string networkIndex, string networkFile = "", string sourceNetworkIndex = "", string previewFile = "")
+        {
+            return $@"Change one network of a program block: replace or insert a network from an XML file, or delete one. LAD/FBD parts are put into flow order and the block is backed up first. Compile the block afterwards.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- blockPath: root-relative path of the block
+- action: 'replace', 'insert' or 'delete'
+- networkIndex: 0-based (network 1 in TIA is 0)
+
+Use the EditBlockNetwork tool with these parameters:
+- softwarePath: {softwarePath}
+- blockPath: {blockPath}
+- action: {action}
+- networkIndex: {networkIndex}{OptionalParameter("networkFile", networkFile)}{OptionalParameter("sourceNetworkIndex", sourceNetworkIndex)}{OptionalParameter("previewFile", previewFile)}";
+        }
+
         [McpServerPrompt(Name = "DeleteBlock"), Description("Delete a block")]
         public static string DeleteBlock(string softwarePath, string blockPath)
         {

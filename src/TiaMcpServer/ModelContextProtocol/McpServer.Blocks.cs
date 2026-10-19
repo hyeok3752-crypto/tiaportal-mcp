@@ -602,6 +602,76 @@ namespace TiaMcpServer.ModelContextProtocol
         #region blocks and types (write)
 
         [WriteTool]
+        [McpServerTool(Name = "EditBlockNetwork", Title = "Replace, insert or delete a network", Destructive = true, Idempotent = false, OpenWorld = false, UseStructuredContent = true),
+         Description("Change one network of a program block without hand-editing the whole block XML: replace or insert a network taken from an XML file (e.g. another block's export), or delete one. LAD/FBD parts are put into the flow order TIA requires and IDs are renumbered; the block is backed up first. Use 'previewFile' to only write the edited block XML. The block must be consistent (compile it first)")]
+        public static ResponseNetworkEdit EditBlockNetwork(
+            [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
+            [Description("blockPath: root-relative path of the block, e.g. 009_Servo/FB_PitchHome_Inch")] string blockPath,
+            [Description("action: 'replace', 'insert' (before networkIndex; the network count appends at the end) or 'delete'")] string action,
+            [Description("networkIndex: 0-based network number in the block (network 1 in TIA is 0), as 'GetNetworkSource' numbers them")] int networkIndex,
+            [Description("networkFile: for replace/insert, absolute path of an XML file holding the network (<SW.Blocks.CompileUnit>), e.g. a block export")] string networkFile = "",
+            [Description("sourceNetworkIndex: which network of networkFile to take, 0-based (default 0)")] int sourceNetworkIndex = 0,
+            [Description("previewFile: optional absolute path; the edited block XML is written there and nothing is imported")] string previewFile = "")
+        {
+            WritePolicy.EnsureEnabled(nameof(EditBlockNetwork));
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(networkFile))
+                {
+                    Operation.RequireAbsolutePath(networkFile, nameof(networkFile));
+                }
+
+                if (!string.IsNullOrWhiteSpace(previewFile))
+                {
+                    Operation.RequireAbsolutePath(previewFile, nameof(previewFile));
+                }
+
+                var result = Portal.EditBlockNetwork(softwarePath, blockPath, action, networkIndex, networkFile, sourceNetworkIndex, previewFile);
+                var verb = action.Trim().ToLowerInvariant() switch
+                {
+                    "delete" => "deleted",
+                    "insert" => "inserted",
+                    _ => "replaced"
+                };
+
+                var message = result.PreviewFile != null
+                    ? $"Preview: network {networkIndex} {verb} in '{result.BlockPath}' ({result.NetworksBefore} -> {result.NetworksAfter} networks), written to '{result.PreviewFile}'. Nothing was imported."
+                    : $"Network {networkIndex} {verb} in '{result.BlockPath}' ({result.NetworksBefore} -> {result.NetworksAfter} networks). Compile the block to check it ('CompileCodeBlock'). {SaveHint}";
+
+                if (result.PartsReordered > 0)
+                {
+                    message += $" {result.PartsReordered} LAD/FBD part(s) were moved into flow order.";
+                }
+
+                var backup = new Portal.BackupResult { Path = result.Backup, Warning = result.BackupWarning };
+
+                return new ResponseNetworkEdit
+                {
+                    BlockPath = result.BlockPath,
+                    Action = verb,
+                    NetworkIndex = networkIndex,
+                    NetworksBefore = result.NetworksBefore,
+                    NetworksAfter = result.NetworksAfter,
+                    PartsReordered = result.PartsReordered,
+                    Backup = result.Backup,
+                    BackupWarning = result.BackupWarning,
+                    PreviewFile = result.PreviewFile,
+                    Message = message + BackupNote(backup),
+                    Meta = OkMeta()
+                };
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error editing a network of '{blockPath}': {ex.Message}", ex);
+            }
+        }
+
+        [WriteTool]
         [McpServerTool(Name = "DeleteBlock", Title = "Delete block", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
          Description("Delete a program block. Its XML is saved first and returned as 'backup', for re-import with 'ImportXmlBlock'. Know-how protected blocks are rejected: remove the protection in TIA Portal first")]
         public static ResponseDeleted DeleteBlock(

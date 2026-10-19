@@ -10,6 +10,8 @@
 
 ### Added
 
+- `EditBlockNetwork` (write): replace, insert or delete one network of a program block. The new network comes from an XML file (e.g. another block's export); LAD/FBD parts are put into the flow order TIA requires on import (rebuilt from the wires, matched TIA's own order on all 110 exported networks tried), IDs are renumbered, and the block is backed up first. `previewFile` writes the edited XML without importing.
+
 - `GetSoftwareChecksum`: the checksum of the compiled program (and of the text lists) of a PLC software, as TIA Portal shows it; equal checksums mean the same compiled program.
 
 - Backup before destructive changes: `DeleteBlock`, `DeleteType`, and `ImportXmlBlock`/`ImportXmlType` when they replace an object of the same name, first export the current object as XML and return its path as `backup`. Folder: `--backup-path`, default `%TEMP%\tiaportal-mcp-backups`.
