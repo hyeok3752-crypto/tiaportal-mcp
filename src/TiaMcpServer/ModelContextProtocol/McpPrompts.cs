@@ -2361,6 +2361,37 @@ Use the ArchiveProject tool with these parameters:
 - targetDirectory: {targetDirectory}{OptionalParameter("archiveName", archiveName)}{OptionalParameter("mode", mode)}";
         }
 
+        [McpServerPrompt(Name = "GetDbStartValues"), Description("List the members of a data block with their start values")]
+        public static string GetDbStartValues(string softwarePath, string blockPath, string regexName = "", string maxMembers = "")
+        {
+            return $@"List the members of a data block (global or instance DB) with data type and start value, including members inside structs, UDTs and arrays. Reads only.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- blockPath: root-relative path of the data block
+
+Use the GetDbStartValues tool with these parameters:
+- softwarePath: {softwarePath}
+- blockPath: {blockPath}{OptionalParameter("regexName", regexName)}{OptionalParameter("maxMembers", maxMembers)}";
+        }
+
+        [McpServerPrompt(Name = "SetDbStartValue"), Description("Change the start value of one data block member")]
+        public static string SetDbStartValue(string softwarePath, string blockPath, string memberPath, string value)
+        {
+            return $@"Change the start value of one data block member, e.g. 'S[3].OriginOffset', without touching the rest of the DB. The DB is backed up first; compile and download with reinitialization afterwards (requires the server started with '--allow-write').
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- blockPath: root-relative path of the data block
+- memberPath: as listed by GetDbStartValues
+
+Use the SetDbStartValue tool with these parameters:
+- softwarePath: {softwarePath}
+- blockPath: {blockPath}
+- memberPath: {memberPath}
+- value: {value}";
+        }
+
         [McpServerPrompt(Name = "GetTechnologyObjects"), Description("List the technology objects (axes, encoders, PID, ...) of a PLC")]
         public static string GetTechnologyObjects(string softwarePath, string regexName = "")
         {

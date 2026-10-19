@@ -10,6 +10,7 @@
 
 ### Added
 
+- `GetDbStartValues` (read) and `SetDbStartValue` (write): list the start values of a data block's members, including members inside structs, UDTs and arrays (e.g. `S[3].OriginOffset`), and change one of them in place without exporting or re-importing the DB. The DB is backed up before a change.
 - `EditBlockNetwork` (write): replace, insert or delete one network of a program block. The new network comes from an XML file (e.g. another block's export); LAD/FBD parts are put into the flow order TIA requires on import (rebuilt from the wires, matched TIA's own order on all 110 exported networks tried), IDs are renumbered, and the block is backed up first. `previewFile` writes the edited XML without importing. With `sclFile` the new network is written as SCL text instead: TIA compiles it in a scratch FB with the block's interface, and that FB is deleted again.
 
 - `GetSoftwareChecksum`: the checksum of the compiled program (and of the text lists) of a PLC software, as TIA Portal shows it; equal checksums mean the same compiled program.
