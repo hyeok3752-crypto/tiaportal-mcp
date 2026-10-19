@@ -903,6 +903,37 @@ Use the EditBlockNetwork tool with these parameters:
 - networkIndex: {networkIndex}{OptionalParameter("networkFile", networkFile)}{OptionalParameter("sourceNetworkIndex", sourceNetworkIndex)}{OptionalParameter("previewFile", previewFile)}{OptionalParameter("sclFile", sclFile)}";
         }
 
+        // Not a tool prompt: the routine that worked for changing blocks live (offline, fingerprint,
+        // smallest edit tool, compile one block, compare). Clients that only read tool lists
+        // get the short form from the server instructions in Program.cs.
+        [McpServerPrompt(Name = "ModifyBlockWorkflow"), Description("Step-by-step routine for changing a PLC block safely")]
+        public static string ModifyBlockWorkflow(string softwarePath, string blockPath, string change)
+        {
+            return $@"Change the PLC block '{blockPath}' in '{softwarePath}': {change}
+
+Follow this routine, one block at a time:
+1. Offline: 'GetOnlineState' with path '{softwarePath}'; if it is online, 'GoOffline'. Compile and import fail while online.
+2. Read: 'GetBlockSource' for the block, 'GetNetworkSource' for single networks. Network numbers are 0-based (network 1 in TIA is 0). For a LAD/FBD network you will change, take its XML from 'ExportXmlBlock' (absolute exportPath).
+3. Fingerprint before: 'GetBlockFingerprints' with regexName '^<block name>$' and saveFile set to an absolute .json path.
+4. Change with the smallest tool that fits:
+   - one LAD/FBD network: copy the network's <SW.Blocks.CompileUnit> from the export into its own file, edit it, then 'EditBlockNetwork' (action 'replace' or 'insert', networkFile) with previewFile first; check the preview, then run the same call without previewFile.
+   - SCL statements as one network: 'EditBlockNetwork' with sclFile (plain SCL statements; '#name' refers to the block's own variables).
+   - one DB start value: 'SetDbStartValue' with the member path from 'GetDbStartValues'.
+   - a whole new SCL block: 'ImportSourceBlock' from a .scl file.
+   The edit tools back the block up first and return the backup path.
+5. Compile: 'CompileCodeBlock' for this block only.
+6. On an import or compile error: fix once, guided by the error message, and retry.
+7. Fingerprint after: 'GetBlockFingerprints' with the same regexName and compareFile set to the file from step 3. Report what changed (code, interface), the backup path, and that the change is in memory until 'SaveProject'. Save only if the user asks.
+
+Do not:
+- rewrite a whole block's XML by hand and re-import it with 'ImportXmlBlock' when only a network or a value changes
+- run 'CompileSoftware' for the whole PLC again and again; compile the changed block
+- repeat a failing call unchanged
+- work around this server with your own scripts, Openness code or edits to project files
+
+Stop rule: if the same step fails twice, stop and show the user the full error text, the call you made and what you would try next.";
+        }
+
         [McpServerPrompt(Name = "DeleteBlock"), Description("Delete a block")]
         public static string DeleteBlock(string softwarePath, string blockPath)
         {

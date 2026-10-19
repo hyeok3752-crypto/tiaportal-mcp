@@ -170,10 +170,17 @@ namespace TiaMcpServer
                             "(2) Understand code: 'GetBlockSource' or 'GetNetworkSource' to read a block, 'FindInCode' to " +
                             "search code text, 'GetCrossReferences' or 'WhereUsed' for who uses a tag or block, 'GetTags' for " +
                             "tags, 'GetDbStartValues' for DB contents. " +
-                            "(3) Change code: do not hand-edit and re-import a whole block's XML; use 'EditBlockNetwork' to " +
-                            "replace, insert or delete one network (LAD part order and IDs are handled, SCL via 'sclFile'), " +
-                            "'SetDbStartValue' for one DB start value, then 'CompileCodeBlock'. Compile and import fail while " +
-                            "the device is online in TIA Portal: 'GoOffline' first. Changes stay in memory until 'SaveProject'. " +
+                            "(3) Change code, one block at a time, in this order: 'GoOffline' if the PLC is online (compile " +
+                            "and import fail while online); read the block ('GetBlockSource', 'GetNetworkSource', for LAD XML " +
+                            "'ExportXmlBlock'); 'GetBlockFingerprints' with 'saveFile'; change it with the smallest tool - " +
+                            "'EditBlockNetwork' for one network (LAD/FBD from an XML file, preview with 'previewFile' first; SCL " +
+                            "statements via 'sclFile'), 'SetDbStartValue' for one DB start value; then 'CompileCodeBlock' for " +
+                            "that block only; on an error fix once from its message; finally 'GetBlockFingerprints' with " +
+                            "'compareFile' and report what changed and the backup path. Do not hand-rewrite and re-import a " +
+                            "whole block's XML, do not compile the whole PLC again and again, do not repeat a failing call " +
+                            "unchanged, and do not work around this server with scripts or file edits. If the same step fails " +
+                            "twice, stop and show the user the full error text. The 'ModifyBlockWorkflow' prompt spells out the " +
+                            "routine. Changes stay in memory until 'SaveProject'; save only when the user asks. " +
                             "(4) Paths: 'softwarePath' is the PLC software name from 'GetProjectTree', e.g. 'PLC_1'. Block, " +
                             "type and group paths are '/'-separated and relative to their system folder ('Program blocks', " +
                             "'PLC data types', 'PLC tags'), e.g. '009_Servo/zGDBs/SM_UserData_Origin'; an empty groupPath means " +

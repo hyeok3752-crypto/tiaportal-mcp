@@ -191,6 +191,13 @@ prompt, so a prompt with few arguments (for example `GetSoftwareInfo`, which onl
 `softwarePath`) cannot take a value of several words: write a normal request instead of the slash
 command.
 
+One prompt has no tool of its own: `ModifyBlockWorkflow` (`softwarePath`, `blockPath`, `change`) walks
+the model through a block change step by step - go offline, read the block, save fingerprints, change it
+with `EditBlockNetwork` or `SetDbStartValue` (LAD preview first), compile only that block, compare
+fingerprints - and tells it to stop and show the error after two failures of the same step. Quote the
+change text, e.g. `/mcp__tia-mcp-server__ModifyBlockWorkflow PLC_1 "009_Servo/FB_PitchHome_Inch" "set the step to 0.5 mm"`.
+The server instructions carry the same routine in short form.
+
 ## Resources
 
 - [TIA Portal Openness API Documentation](https://docs.tia.siemens.cloud/r/en-us/v21/tia-portal-openness-api-for-automation-of-engineering-workflows)
