@@ -439,6 +439,10 @@ namespace TiaMcpServer.ModelContextProtocol
 
     public class ResponseImportXmlBlock : ResponseMessage
     {
+        /// <summary>XML export of the block of the same name that the import replaced, taken just before.</summary>
+        public string? Backup { get; set; }
+
+        public string? BackupWarning { get; set; }
     }
 
     public class ResponseExportXmlBlocks : ResponseMessage
@@ -459,6 +463,10 @@ namespace TiaMcpServer.ModelContextProtocol
 
     public class ResponseImportXmlType : ResponseMessage
     {
+        /// <summary>XML export of the type of the same name that the import replaced, taken just before.</summary>
+        public string? Backup { get; set; }
+
+        public string? BackupWarning { get; set; }
     }
 
     public class ResponseExportXmlTypes : ResponseMessage

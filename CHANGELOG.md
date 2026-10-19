@@ -10,6 +10,10 @@
 
 ### Added
 
+- `GetSoftwareChecksum`: the checksum of the compiled program (and of the text lists) of a PLC software, as TIA Portal shows it; equal checksums mean the same compiled program.
+
+- Backup before destructive changes: `DeleteBlock`, `DeleteType`, and `ImportXmlBlock`/`ImportXmlType` when they replace an object of the same name, first export the current object as XML and return its path as `backup`. Folder: `--backup-path`, default `%TEMP%\tiaportal-mcp-backups`.
+
 - `GetTechnologyObjects`, `GetTechnologyObjectParameters`: list the technology objects (axes, encoders, cams, PID, ...) of a PLC and read one object's configuration parameters as name/value pairs, filterable by name (e.g. `Homing|PositionLimits`). Technology objects are not program blocks, so no other tool showed them.
 
 - `SetTechnologyObjectParameter` (write): change one technology object parameter in the offline project. The text value is converted to the parameter's type; TIA checks the range and refuses read-only parameters. Old and new value are returned.

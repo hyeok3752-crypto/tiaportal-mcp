@@ -984,6 +984,20 @@ namespace TiaMcpServer.ModelContextProtocol
             Meta = OkMeta()
         };
 
+        private static ResponseDeleted WithBackup(ResponseDeleted response, Portal.BackupResult backup)
+        {
+            response.Backup = backup.Path;
+            response.BackupWarning = backup.Warning;
+            response.Message += BackupNote(backup);
+            return response;
+        }
+
+        /// <summary>Message suffix naming the backup file, or why there is none.</summary>
+        private static string BackupNote(Portal.BackupResult backup) =>
+            backup.Path != null ? $" Previous version saved to '{backup.Path}'."
+            : backup.Warning != null ? $" {backup.Warning}"
+            : string.Empty;
+
         private static ResponseRenamed Renamed(string kind, string oldPath, string newName, string newPath) => new ResponseRenamed
         {
             Kind = kind,

@@ -46,6 +46,7 @@ has since diverged with its own feature set below; it no longer tracks upstream 
 | `--software-path <path>`  | Preset for the `softwarePath` tool argument, e.g. `PLC_1`. See below.     |
 | `--export-path <path>`    | Preset for the `exportPath` tool argument. See below.                     |
 | `--preserve-path <bool>`  | Preset for the `preservePath` tool argument (`true` or `false`). See below. |
+| `--backup-path <path>`    | Folder for the XML backups taken before a delete or replacing import. Default `%TEMP%\tiaportal-mcp-backups`. |
 | `--with-dependencies <bool>` | Preset for the `withDependencies` argument of the `ExportSource*` tools (`true` or `false`). See below. |
 
 ## Presetting tool arguments
@@ -99,9 +100,15 @@ either, and gate themselves a different way:
 To enable write mode, add the argument to your client configuration, for example
 `"args": ["--allow-write"]`.
 
+Before `DeleteBlock`, `DeleteType`, and an `ImportXmlBlock`/`ImportXmlType` that replaces an
+object of the same name, the current object is exported as XML to
+`<backup path>\<yyyyMMdd>\<time>_<tool>_<object>.xml` and the reply names the file (`backup`).
+Re-importing that file restores the old version even after the project was saved. An object TIA
+will not export (inconsistent) is changed anyway and the reply says why there is no backup.
+
 ## Tools
 
-161 tools total. Read-only/ungated tools (92) are always available.
+162 tools total. Read-only/ungated tools (93) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -113,7 +120,7 @@ To enable write mode, add the argument to your client configuration, for example
 | PRONETA                       | `CompareNetworkCsv`                                                                                                                                                                                    |
 | Engineering-station online    | `GetOnlineState`, `GoOnline`, `GoOffline`                                                                                                                                                             |
 | Direct PLC (S7CommPlus, experimental) | `ConnectPlcDirect`, `DisconnectPlcDirect`, `BrowsePlcTagsDirect`, `ReadPlcTagValuesDirect`, `WritePlcTagValueDirect`, `GetActivePlcAlarmsDirect`                                             |
-| PLC software                  | `GetSoftwareInfo`, `GetSoftwareTree`, `CompileSoftware`, `CompileCodeBlock`, `CompareSoftware`, `GetBlockFingerprints`, `GetSafetyInfo`                                                                                                                                            |
+| PLC software                  | `GetSoftwareInfo`, `GetSoftwareTree`, `CompileSoftware`, `CompileCodeBlock`, `CompareSoftware`, `GetBlockFingerprints`, `GetSoftwareChecksum`, `GetSafetyInfo`                                                                                                                                            |
 | Technology objects            | `GetTechnologyObjects`, `GetTechnologyObjectParameters`                                                                                                                                              |
 | Blocks                        | `GetBlocks`, `GetBlockInfo`, `GetBlocksWithHierarchy`, `GetBlockInterface`, `ExportXmlBlock`, `ExportXmlBlocks`                                                                                        |
 | Types                         | `GetTypes`, `GetTypeInfo`, `ExportXmlType`, `ExportXmlTypes`                                                                                                                                           |
@@ -334,7 +341,7 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 141 of the 161 tools publish an `outputSchema` and return `structuredContent` (77 of 92
+- 142 of the 162 tools publish an `outputSchema` and return `structuredContent` (78 of 93
   read-only, 64 of 69 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
 - Independently of that, `GetState` can report the progress of another call still running on the

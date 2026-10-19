@@ -26,6 +26,12 @@ namespace TiaMcpServer.ModelContextProtocol
     {
         public string? Kind { get; set; }
         public string? Path { get; set; }
+
+        /// <summary>DeleteBlock/DeleteType: XML export of the object taken just before the delete.</summary>
+        public string? Backup { get; set; }
+
+        /// <summary>Why no backup was written, e.g. the object was inconsistent.</summary>
+        public string? BackupWarning { get; set; }
     }
 
     public class ResponseRenamed : ResponseMessage

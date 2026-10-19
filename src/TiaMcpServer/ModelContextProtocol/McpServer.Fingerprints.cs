@@ -157,6 +157,52 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
+        [McpServerTool(Name = "GetSoftwareChecksum", Title = "Get software checksum", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
+         Description("Read the checksum of the compiled program of a PLC software (and of its text lists), as TIA Portal shows it. Two equal checksums mean the same compiled program, e.g. before and after a change, or project and CPU. Empty until the program is compiled")]
+        public static ResponseSoftwareChecksum GetSoftwareChecksum(
+            [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath)
+        {
+            try
+            {
+                var checksums = Portal.GetSoftwareChecksum(softwarePath);
+
+                string message;
+                if (!checksums.Supported)
+                {
+                    message = $"'{softwarePath}' does not support a software checksum.";
+                }
+                else if (checksums.Software == null)
+                {
+                    message = $"'{softwarePath}' has no software checksum yet: compile it first ('CompileSoftware').";
+                }
+                else
+                {
+                    message = $"Software checksum of '{softwarePath}': {checksums.Software}.";
+                }
+
+                return new ResponseSoftwareChecksum
+                {
+                    Supported = checksums.Supported,
+                    Software = checksums.Software,
+                    TextLists = checksums.TextLists,
+                    Message = message,
+                    Meta = new JsonObject
+                    {
+                        ["timestamp"] = DateTime.Now,
+                        ["success"] = true
+                    }
+                };
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error reading the software checksum of '{softwarePath}': {ex.Message}", ex);
+            }
+        }
+
         private static string CompareFingerprints(JsonObject baseline, TiaMcpServer.Siemens.Portal.FingerprintScan scan, bool complete, string groupPath, string regexName,
             ResponseBlockFingerprints response, List<string> warnings)
         {

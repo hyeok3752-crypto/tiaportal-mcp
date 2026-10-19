@@ -329,7 +329,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [WriteTool]
-        [McpServerTool(Name = "ImportXmlBlock", Title = "Import block from XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Import one program block from an XML file into a block group. An existing block of the same name is replaced")]
+        [McpServerTool(Name = "ImportXmlBlock", Title = "Import block from XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Import one program block from an XML file into a block group. An existing block of the same name is replaced; its previous XML is saved first and returned as 'backup'")]
         public static ResponseImportXmlBlock ImportXmlBlock(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("groupPath: defines the path in the project structure to the group, where to import the block")] string groupPath,
@@ -339,11 +339,15 @@ namespace TiaMcpServer.ModelContextProtocol
 
             try
             {
+                var backup = Portal.BackupBlockReplacedByImport(softwarePath, importPath, nameof(ImportXmlBlock));
+
                 if (Portal.ImportXmlBlock(softwarePath, groupPath, importPath))
                 {
                     return new ResponseImportXmlBlock
                     {
-                        Message = $"Block imported from '{importPath}' to '{groupPath}'",
+                        Backup = backup.Path,
+                        BackupWarning = backup.Warning,
+                        Message = $"Block imported from '{importPath}' to '{groupPath}'" + BackupNote(backup),
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,
@@ -599,15 +603,16 @@ namespace TiaMcpServer.ModelContextProtocol
 
         [WriteTool]
         [McpServerTool(Name = "DeleteBlock", Title = "Delete block", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Delete a program block. Know-how protected blocks are rejected: remove the protection in TIA Portal first")]
+         Description("Delete a program block. Its XML is saved first and returned as 'backup', for re-import with 'ImportXmlBlock'. Know-how protected blocks are rejected: remove the protection in TIA Portal first")]
         public static ResponseDeleted DeleteBlock(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("blockPath: root-relative path of the block, e.g. 1_Tests/FC_Block_1")] string blockPath)
         {
             return Guarded(nameof(DeleteBlock), () =>
             {
+                var backup = Portal.BackupBlock(softwarePath, blockPath, nameof(DeleteBlock));
                 Portal.DeleteBlock(softwarePath, blockPath);
-                return Deleted("Block", blockPath);
+                return WithBackup(Deleted("Block", blockPath), backup);
             });
         }
 

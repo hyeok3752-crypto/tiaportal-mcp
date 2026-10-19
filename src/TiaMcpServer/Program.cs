@@ -24,6 +24,7 @@ namespace TiaMcpServer
             // Set before the --doctor branch below, which reports the write mode, and before the
             // host registers its tool types.
             WritePolicy.AllowWrite = options.AllowWrite;
+            TiaMcpServer.Siemens.Portal.BackupRoot = options.BackupPath;
 
             // Before the host registers its tool types: Apply reads the presets.
             ToolDefaults.Configure(options);

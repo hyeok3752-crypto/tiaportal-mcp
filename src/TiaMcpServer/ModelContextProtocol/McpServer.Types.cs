@@ -168,7 +168,7 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [WriteTool]
-        [McpServerTool(Name = "ImportXmlType", Title = "Import type from XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Import one PLC data type from an XML file into a type group. An existing type of the same name is replaced")]
+        [McpServerTool(Name = "ImportXmlType", Title = "Import type from XML", Destructive = true, Idempotent = true, OpenWorld = false), Description("Import one PLC data type from an XML file into a type group. An existing type of the same name is replaced; its previous XML is saved first and returned as 'backup'")]
         public static ResponseImportXmlType ImportXmlType(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("groupPath: defines the path in the project structure to the group, where to import the type")] string groupPath,
@@ -178,11 +178,15 @@ namespace TiaMcpServer.ModelContextProtocol
 
             try
             {
+                var backup = Portal.BackupTypeReplacedByImport(softwarePath, importPath, nameof(ImportXmlType));
+
                 if (Portal.ImportXmlType(softwarePath, groupPath, importPath))
                 {
                     return new ResponseImportXmlType
                     {
-                        Message = $"Type imported from '{importPath}' to '{groupPath}'",
+                        Backup = backup.Path,
+                        BackupWarning = backup.Warning,
+                        Message = $"Type imported from '{importPath}' to '{groupPath}'" + BackupNote(backup),
                         Meta = new JsonObject
                         {
                             ["timestamp"] = DateTime.Now,
@@ -375,15 +379,16 @@ namespace TiaMcpServer.ModelContextProtocol
 
         [WriteTool]
         [McpServerTool(Name = "DeleteType", Title = "Delete type", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
-         Description("Delete a PLC data type (UDT). Know-how protected types are rejected")]
+         Description("Delete a PLC data type (UDT). Its XML is saved first and returned as 'backup', for re-import with 'ImportXmlType'. Know-how protected types are rejected")]
         public static ResponseDeleted DeleteType(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("typePath: root-relative path of the type, e.g. Common/CarrierRegister/ML_SubstratState")] string typePath)
         {
             return Guarded(nameof(DeleteType), () =>
             {
+                var backup = Portal.BackupType(softwarePath, typePath, nameof(DeleteType));
                 Portal.DeleteType(softwarePath, typePath);
-                return Deleted("Type", typePath);
+                return WithBackup(Deleted("Type", typePath), backup);
             });
         }
 

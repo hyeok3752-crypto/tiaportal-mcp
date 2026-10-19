@@ -2305,6 +2305,18 @@ Use the GetBlockFingerprints tool with these parameters:
 - softwarePath: {softwarePath}{OptionalParameter("groupPath", groupPath)}{OptionalParameter("regexName", regexName)}{OptionalParameter("saveFile", saveFile)}{OptionalParameter("compareFile", compareFile)}{OptionalParameter("maxBlocks", maxBlocks)}";
         }
 
+        [McpServerPrompt(Name = "GetSoftwareChecksum"), Description("Read the checksum of the compiled program of a PLC")]
+        public static string GetSoftwareChecksum(string softwarePath)
+        {
+            return $@"Read the checksum of the compiled program of a PLC software. Equal checksums mean the same compiled program; it is empty until the program is compiled.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+
+Use the GetSoftwareChecksum tool with these parameters:
+- softwarePath: {softwarePath}";
+        }
+
         [McpServerPrompt(Name = "CompareSoftware"), Description("Compare a PLC software with the online PLC or another PLC")]
         public static string CompareSoftware(string softwarePath, string otherSoftwarePath = "", string maxItems = "")
         {

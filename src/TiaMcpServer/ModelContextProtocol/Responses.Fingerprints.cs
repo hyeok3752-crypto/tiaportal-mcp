@@ -47,4 +47,15 @@ namespace TiaMcpServer.ModelContextProtocol
         /// <summary>Which aspects changed, e.g. ProgramCode, Interface, Comments.</summary>
         public List<string> Aspects { get; set; } = new List<string>();
     }
+
+    public class ResponseSoftwareChecksum : ResponseMessage
+    {
+        public bool Supported { get; set; }
+
+        /// <summary>Checksum of the compiled program; null until the program is compiled.</summary>
+        public string? Software { get; set; }
+
+        /// <summary>Checksum of the text lists.</summary>
+        public string? TextLists { get; set; }
+    }
 }
