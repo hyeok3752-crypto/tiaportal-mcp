@@ -603,7 +603,7 @@ namespace TiaMcpServer.ModelContextProtocol
 
         [WriteTool]
         [McpServerTool(Name = "EditBlockNetwork", Title = "Replace, insert or delete a network", Destructive = true, Idempotent = false, OpenWorld = false, UseStructuredContent = true),
-         Description("Change one network of a program block without hand-editing the whole block XML: replace or insert a network taken from an XML file (e.g. another block's export), or delete one. LAD/FBD parts are put into the flow order TIA requires and IDs are renumbered; the block is backed up first. Use 'previewFile' to only write the edited block XML. The block must be consistent (compile it first)")]
+         Description("Change one network of a program block without hand-editing the whole block XML: replace or insert a network taken from an XML file (e.g. another block's export) or written as SCL text ('sclFile'), or delete one. LAD/FBD parts are put into the flow order TIA requires and IDs are renumbered; the block is backed up first. Use 'previewFile' to only write the edited block XML. The block must be consistent (compile it first)")]
         public static ResponseNetworkEdit EditBlockNetwork(
             [Description("softwarePath: defines the path in the project structure to the PLC software")] string softwarePath,
             [Description("blockPath: root-relative path of the block, e.g. 009_Servo/FB_PitchHome_Inch")] string blockPath,
@@ -611,7 +611,8 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("networkIndex: 0-based network number in the block (network 1 in TIA is 0), as 'GetNetworkSource' numbers them")] int networkIndex,
             [Description("networkFile: for replace/insert, absolute path of an XML file holding the network (<SW.Blocks.CompileUnit>), e.g. a block export")] string networkFile = "",
             [Description("sourceNetworkIndex: which network of networkFile to take, 0-based (default 0)")] int sourceNetworkIndex = 0,
-            [Description("previewFile: optional absolute path; the edited block XML is written there and nothing is imported")] string previewFile = "")
+            [Description("previewFile: optional absolute path; the edited block XML is written there and nothing is imported")] string previewFile = "",
+            [Description("sclFile: for replace/insert, instead of networkFile: absolute path of a text file with the SCL statements of the new network ('#' names refer to this block's interface). TIA compiles it in a scratch FB that is deleted again, also in preview")] string sclFile = "")
         {
             WritePolicy.EnsureEnabled(nameof(EditBlockNetwork));
 
@@ -627,7 +628,12 @@ namespace TiaMcpServer.ModelContextProtocol
                     Operation.RequireAbsolutePath(previewFile, nameof(previewFile));
                 }
 
-                var result = Portal.EditBlockNetwork(softwarePath, blockPath, action, networkIndex, networkFile, sourceNetworkIndex, previewFile);
+                if (!string.IsNullOrWhiteSpace(sclFile))
+                {
+                    Operation.RequireAbsolutePath(sclFile, nameof(sclFile));
+                }
+
+                var result = Portal.EditBlockNetwork(softwarePath, blockPath, action, networkIndex, networkFile, sourceNetworkIndex, previewFile, sclFile);
                 var verb = action.Trim().ToLowerInvariant() switch
                 {
                     "delete" => "deleted",
@@ -642,6 +648,11 @@ namespace TiaMcpServer.ModelContextProtocol
                 if (result.PartsReordered > 0)
                 {
                     message += $" {result.PartsReordered} LAD/FBD part(s) were moved into flow order.";
+                }
+
+                if (result.SclCompiled)
+                {
+                    message += " The SCL text compiled in a scratch FB, which was deleted again.";
                 }
 
                 var backup = new Portal.BackupResult { Path = result.Backup, Warning = result.BackupWarning };

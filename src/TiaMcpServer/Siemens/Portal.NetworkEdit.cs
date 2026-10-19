@@ -1,10 +1,15 @@
+using Microsoft.Extensions.Logging;
 using Siemens.Engineering;
+using Siemens.Engineering.Compiler;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.ExternalSources;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace TiaMcpServer.Siemens
@@ -26,6 +31,11 @@ namespace TiaMcpServer.Siemens
         // - IDs. Every ID attribute of the document is renumbered, so a network copied from
         //   another export cannot collide with the IDs already in the block.
         // - Backup. The block is exported to the backup folder first, like DeleteBlock.
+        // - SCL networks. SimaticML stores SCL as tokens, not text, so a network written as SCL
+        //   text is turned into XML by TIA itself: a scratch FB with the target block's
+        //   interface and the text as its body is generated from a source, compiled, exported,
+        //   and deleted again; its network is what gets inserted (the manual trick used for the
+        //   Vision_2D Cell ID network, 2026-10-16).
 
         public sealed class NetworkEditResult
         {
@@ -36,14 +46,16 @@ namespace TiaMcpServer.Siemens
             public string? Backup { get; set; }
             public string? BackupWarning { get; set; }
             public string? PreviewFile { get; set; }
+            public bool SclCompiled { get; set; }
         }
 
         /// <param name="action">"replace", "insert" (before networkIndex; the network count appends) or "delete".</param>
         /// <param name="networkFile">For replace/insert: an XML file holding a SW.Blocks.CompileUnit, e.g. a block export; its first network is used.</param>
         /// <param name="sourceNetworkIndex">Which network of networkFile to take (0-based, default 0).</param>
         /// <param name="previewFile">When set, the edited block XML is written there and nothing is imported.</param>
+        /// <param name="sclFile">For replace/insert, instead of networkFile: a text file with the SCL statements of the new network.</param>
         public NetworkEditResult EditBlockNetwork(string softwarePath, string blockPath, string action, int networkIndex,
-            string networkFile, int sourceNetworkIndex, string previewFile)
+            string networkFile, int sourceNetworkIndex, string previewFile, string sclFile = "")
         {
             return Operation.Run(_logger, nameof(EditBlockNetwork), PortalErrorCode.ImportFailed,
                 () =>
@@ -69,8 +81,19 @@ namespace TiaMcpServer.Siemens
                         throw new PortalException(PortalErrorCode.InvalidState, $"Block '{block.Name}' has no block group to import into.");
                     }
 
+                    var useScl = !string.IsNullOrWhiteSpace(sclFile);
+                    if (useScl && !string.IsNullOrWhiteSpace(networkFile))
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, "Give either 'networkFile' or 'sclFile', not both.");
+                    }
+
+                    if (useScl && !File.Exists(sclFile))
+                    {
+                        throw new PortalException(PortalErrorCode.NotFound, $"sclFile '{sclFile}' does not exist.");
+                    }
+
                     XElement? incoming = null;
-                    if (mode != "delete")
+                    if (mode != "delete" && !useScl)
                     {
                         incoming = LoadCompileUnit(networkFile, sourceNetworkIndex);
                     }
@@ -82,6 +105,13 @@ namespace TiaMcpServer.Siemens
                     block.Export(new FileInfo(exportFile), ExportOptions.None);
 
                     var doc = XDocument.Load(exportFile);
+
+                    if (mode != "delete" && useScl)
+                    {
+                        incoming = BuildSclNetwork(softwarePath, doc, sclFile, scope.Directory);
+                        result.SclCompiled = true;
+                    }
+
                     var units = CompileUnits(doc);
                     result.NetworksBefore = units.Count;
 
@@ -163,6 +193,147 @@ namespace TiaMcpServer.Siemens
                     return result;
                 },
                 ("softwarePath", softwarePath), ("blockPath", blockPath), ("action", action), ("networkIndex", networkIndex));
+        }
+
+        /// <summary>
+        /// Lets TIA turn SCL text into a network: generates a scratch FB whose interface repeats
+        /// the target block's (so '#' names resolve the same way), compiles it, exports it and
+        /// returns its first network. The scratch FB and its source are always removed again.
+        /// </summary>
+        private XElement BuildSclNetwork(string softwarePath, XDocument blockDoc, string sclFile, string workDirectory)
+        {
+            var body = File.ReadAllText(sclFile);
+            var name = $"_McpSclNet_{Guid.NewGuid():N}".Substring(0, 23);
+            var optimized = !string.Equals(
+                blockDoc.Descendants().FirstOrDefault(e => e.Name.LocalName == "MemoryLayout")?.Value, "Standard", StringComparison.OrdinalIgnoreCase);
+
+            var source = new StringBuilder();
+            source.AppendLine($"FUNCTION_BLOCK \"{name}\"");
+            source.AppendLine($"{{ S7_Optimized_Access := '{(optimized ? "TRUE" : "FALSE")}' }}");
+            source.AppendLine("VERSION : 0.1");
+
+            var sections = blockDoc.Descendants().FirstOrDefault(e => e.Name.LocalName == "Interface")?
+                .Descendants().Where(e => e.Name.LocalName == "Section") ?? Enumerable.Empty<XElement>();
+
+            foreach (var section in sections)
+            {
+                var keyword = (string?)section.Attribute("Name") switch
+                {
+                    "Input" => "VAR_INPUT",
+                    "Output" => "VAR_OUTPUT",
+                    "InOut" => "VAR_IN_OUT",
+                    "Static" => "VAR",
+                    "Temp" => "VAR_TEMP",
+                    "Constant" => "VAR CONSTANT",
+                    _ => null // Return: an FB has none
+                };
+
+                var members = section.Elements().Where(e => e.Name.LocalName == "Member").ToList();
+                if (keyword == null || members.Count == 0)
+                {
+                    continue;
+                }
+
+                source.AppendLine(keyword);
+                foreach (var member in members)
+                {
+                    AppendSclDeclaration(source, member, "   ", keyword == "VAR CONSTANT");
+                }
+
+                source.AppendLine("END_VAR");
+            }
+
+            source.AppendLine();
+            source.AppendLine("BEGIN");
+            source.AppendLine(body.TrimEnd());
+            source.AppendLine("END_FUNCTION_BLOCK");
+
+            var file = Path.Combine(workDirectory, name + ".scl");
+            File.WriteAllText(file, source.ToString(), new UTF8Encoding(true));
+
+            var generated = ImportOneSource(softwarePath, file, string.Empty, GenerateBlockOption.None, isType: false);
+            var path = generated.FirstOrDefault(i => i.Kind == "block")?.Path
+                ?? throw new PortalException(PortalErrorCode.ImportFailed, "TIA generated no block from the SCL text.");
+
+            try
+            {
+                var scratch = GetBlock(softwarePath, path)
+                    ?? throw new PortalException(PortalErrorCode.ImportFailed, $"Generated SCL block '{path}' was not found.");
+
+                var compiled = scratch.GetService<ICompilable>()?.Compile();
+                if (compiled != null && compiled.State == CompilerResultState.Error)
+                {
+                    var errors = CompilerErrors(compiled.Messages).Take(10).ToList();
+                    throw new PortalException(PortalErrorCode.InvalidParams,
+                        "The SCL text does not compile in this block's context: " +
+                        (errors.Count > 0 ? string.Join(" | ", errors) : $"{compiled.ErrorCount} error(s)."));
+                }
+
+                var exportFile = Path.Combine(workDirectory, name + ".xml");
+                scratch.Export(new FileInfo(exportFile), ExportOptions.None);
+
+                var unit = CompileUnits(XDocument.Load(exportFile)).FirstOrDefault()
+                    ?? throw new PortalException(PortalErrorCode.ImportFailed, "The compiled SCL block exported no network.");
+
+                return new XElement(unit);
+            }
+            finally
+            {
+                try
+                {
+                    GetBlock(softwarePath, path)?.Delete();
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Could not delete scratch SCL block '{Path}'", path);
+                }
+            }
+        }
+
+        private static readonly Regex SclIdentifier = new Regex("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
+
+        /// <summary>One interface member as an SCL declaration; Struct members recurse.</summary>
+        private static void AppendSclDeclaration(StringBuilder source, XElement member, string indent, bool withStartValue)
+        {
+            var name = (string?)member.Attribute("Name") ?? string.Empty;
+            var datatype = (string?)member.Attribute("Datatype") ?? string.Empty;
+            var quoted = SclIdentifier.IsMatch(name) ? name : "\"" + name + "\"";
+
+            if (datatype.EndsWith("Struct", StringComparison.OrdinalIgnoreCase))
+            {
+                source.AppendLine($"{indent}{quoted} : {datatype}");
+                foreach (var child in member.Elements().Where(e => e.Name.LocalName == "Member"))
+                {
+                    AppendSclDeclaration(source, child, indent + "   ", false);
+                }
+
+                source.AppendLine($"{indent}END_STRUCT;");
+                return;
+            }
+
+            var start = withStartValue ? member.Elements().FirstOrDefault(e => e.Name.LocalName == "StartValue")?.Value : null;
+            source.AppendLine(start == null ? $"{indent}{quoted} : {datatype};" : $"{indent}{quoted} : {datatype} := {start};");
+        }
+
+        private static IEnumerable<string> CompilerErrors(CompilerResultMessageComposition? messages)
+        {
+            if (messages == null)
+            {
+                yield break;
+            }
+
+            foreach (var message in messages)
+            {
+                if (message.State == CompilerResultState.Error && !string.IsNullOrWhiteSpace(message.Description))
+                {
+                    yield return message.Description;
+                }
+
+                foreach (var inner in CompilerErrors(message.Messages))
+                {
+                    yield return inner;
+                }
+            }
         }
 
         private static List<XElement> CompileUnits(XDocument doc) =>
