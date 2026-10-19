@@ -658,7 +658,9 @@ namespace TiaMcpServer.ModelContextProtocol
                     BackupWarning = result.BackupWarning,
                     PreviewFile = result.PreviewFile,
                     Message = message + BackupNote(backup),
-                    Meta = OkMeta()
+                    Meta = result.PreviewFile != null
+                        ? new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
+                        : OkMeta()
                 };
             }
             catch (PortalException pex)
