@@ -41,8 +41,8 @@ namespace TiaMcpServer.Siemens
     /// </summary>
     public static class Diagnostics
     {
-        // Openness of this server targets V20+; V21 is the oldest version worth reporting.
-        private const int MinTiaMajorVersion = 21;
+        // Openness of this server targets V20+ (one build per version, see TiaMcpServer.csproj).
+        private const int MinTiaMajorVersion = 20;
         private const int MaxTiaMajorVersion = 30;
 
         // V20+ splits Openness into Siemens.Engineering.Base.dll and friends; older installations
@@ -95,7 +95,7 @@ namespace TiaMcpServer.Siemens
                 status += $"\n├─ Project: No project open";
             }
 
-            status += $"\n├─ Active Version: V{Openness.TiaMajorVersion}";
+            status += $"\n├─ Active Version: V{Openness.TiaMajorVersion} (exe built for V{Openness.BuildTiaMajorVersion} Openness)";
 
             if (installations.Count > 0)
             {
@@ -133,7 +133,7 @@ namespace TiaMcpServer.Siemens
         }
 
         /// <summary>
-        /// Discovers all installed TIA Portal versions >= V21 and checks whether the Openness
+        /// Discovers all installed TIA Portal versions >= V20 and checks whether the Openness
         /// assembly and Portal.exe are actually present in each installation.
         /// </summary>
         public static IReadOnlyList<TiaInstallation> GetInstalledTiaPortalVersions()

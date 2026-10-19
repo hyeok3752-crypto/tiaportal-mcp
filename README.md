@@ -38,7 +38,7 @@ has since diverged with its own feature set below; it no longer tracks upstream 
 
 | Argument                  | Description                                                               |
 | ------------------------- | ------------------------------------------------------------------------- |
-| `--tia-major-version <n>` | TIA Portal major version to bind against. Default `21`.                   |
+| `--tia-major-version <n>` | TIA Portal major version to bind against. Default: the version the exe was built for (`20`, or `21` with `-p:TiaVersion=21`). |
 | `--logging <1\|2\|3>`     | `1` stderr, `2` debug output, `3` Windows event log. Omit for no logging. |
 | `--doctor`                | Print the environment report and exit without starting the MCP server.    |
 | `--allow-write`           | Register the project-mutating tools. Omitted by default; see below.       |
@@ -229,8 +229,10 @@ project, or change user group membership.
 
 ## TIA-Portal Versions
 
-- __V21__ is the default version.
-- Previous versions are also supported, but must use the `--tia-major-version` argument to specify the version.
+- One exe serves one Openness version. V21 split `Siemens.Engineering.dll` into several assemblies with a new identity, so a V20 build cannot attach to V21 and the other way round.
+- __V20__ is the default build: `dotnet build -c Release`.
+- For __V21__ build on a PC with TIA Portal V21 installed: `dotnet build -c Release -p:TiaVersion=21`. The exe lands in `bin\V21\Release\net48` and binds to V21 without `--tia-major-version`. This build has not been tested against a live V21 installation yet.
+- Starting an exe with a newer `--tia-major-version` than it was built for stops with a message saying which build is needed, instead of crashing inside Openness. `--doctor` shows the build version next to the active one.
 - Export as documents (.s7dcl/.s7res) via `ExportAsDocuments`/`ExportBlocksAsDocuments` requires TIA Portal V20 or newer.
 - Import from documents (.s7dcl/.s7res) via `ImportFromDocuments`/`ImportBlocksFromDocuments` also requires TIA Portal V20 or newer.
 - The same for PLC data types - `ExportTypeAsDocuments`, `ExportTypesAsDocuments`,

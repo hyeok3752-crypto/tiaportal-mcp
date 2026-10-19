@@ -141,6 +141,8 @@ namespace TiaMcpServer.Siemens
                     throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal");
                 }
 
+                Operation.RequireAbsolutePath(exportPath);
+
                 var type = GetType(softwarePath, typePath);
 
                 if (type == null)
@@ -206,6 +208,8 @@ namespace TiaMcpServer.Siemens
                     {
                         throw new PortalException(PortalErrorCode.InvalidState, "No project is open in TIA Portal.");
                     }
+
+                    Operation.RequireAbsolutePath(importPath, nameof(importPath));
 
                     var fileInfo = new FileInfo(importPath);
 

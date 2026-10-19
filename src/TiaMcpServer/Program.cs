@@ -19,7 +19,18 @@ namespace TiaMcpServer
         {
             var options = CliOptions.ParseArgs(args);
 
-            Engineering.TiaMajorVersion = options.TiaMajorVersion ?? 21;
+            Engineering.TiaMajorVersion = options.TiaMajorVersion ?? Openness.BuildTiaMajorVersion;
+
+            // A V20 build asked for V21 used to die inside Openness with 'Exception.ToString() failed'
+            // before the client saw anything. Say what is wrong instead.
+            if (Engineering.TiaMajorVersion > Openness.BuildTiaMajorVersion)
+            {
+                Console.Error.WriteLine(
+                    $"This TiaMcpServer.exe was built for TIA Portal V{Openness.BuildTiaMajorVersion} Openness and cannot " +
+                    $"attach to V{Engineering.TiaMajorVersion}. Build it for V{Engineering.TiaMajorVersion} on a PC with that " +
+                    $"version installed: dotnet build -c Release -p:TiaVersion={Engineering.TiaMajorVersion} (output in bin\\V{Engineering.TiaMajorVersion}).");
+                Environment.Exit(1);
+            }
 
             // Set before the --doctor branch below, which reports the write mode, and before the
             // host registers its tool types.
@@ -162,7 +173,14 @@ namespace TiaMcpServer
                             "(3) Change code: do not hand-edit and re-import a whole block's XML; use 'EditBlockNetwork' to " +
                             "replace, insert or delete one network (LAD part order and IDs are handled, SCL via 'sclFile'), " +
                             "'SetDbStartValue' for one DB start value, then 'CompileCodeBlock'. Compile and import fail while " +
-                            "the device is online in TIA Portal: 'GoOffline' first. Changes stay in memory until 'SaveProject'." +
+                            "the device is online in TIA Portal: 'GoOffline' first. Changes stay in memory until 'SaveProject'. " +
+                            "(4) Paths: 'softwarePath' is the PLC software name from 'GetProjectTree', e.g. 'PLC_1'. Block, " +
+                            "type and group paths are '/'-separated and relative to their system folder ('Program blocks', " +
+                            "'PLC data types', 'PLC tags'), e.g. '009_Servo/zGDBs/SM_UserData_Origin'; an empty groupPath means " +
+                            "that root. File paths ('exportPath', 'importPath') are absolute paths on the PC running this server. " +
+                            "(5) Formats: XML (SimaticML) is complete and is what 'ImportXmlBlock' and 'EditBlockNetwork' use; " +
+                            "documents (.s7dcl/.s7res, V20+) are readable text for review; external source (.scl/.db/.awl) " +
+                            "exists only for SCL, STL and DB blocks." +
                             (ToolDefaults.Presets.Count > 0
                                 ? " The server presets " + string.Join(", ", ToolDefaults.Presets.Keys.OrderBy(k => k, StringComparer.Ordinal)) +
                                   ": leave them out of a call to use the preset, pass a value to override it. 'GetState' shows the presets."
