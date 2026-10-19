@@ -214,7 +214,8 @@ PowerShell (no admin needed; Windows asks for confirmation when a tool or the gr
 powershell -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/p-7347/tiaportal-mcp/rebase/upstream-base/install/install-tiaportal-mcp.ps1 -OutFile $env:TEMP\install-tiaportal-mcp.ps1; & $env:TEMP\install-tiaportal-mcp.ps1"
 ```
 
-It installs missing build tools with winget, detects TIA Portal V20/V21 and builds for it, checks the
+It installs missing build tools with winget, detects TIA Portal V20/V21 and builds for it (both
+installed: builds both and registers them as `tiaportal-mcp-v20` and `tiaportal-mcp-v21`), checks the
 `Siemens TIA Openness` group (`-AddToOpennessGroup` adds you), clones or updates the source in
 `C:\Tools\tiaportal-mcp`, runs `--doctor`, registers the server read-only with Claude Desktop,
 Claude Code and Antigravity when they are installed, and prints an `mcpServers` example for other

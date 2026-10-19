@@ -14,7 +14,8 @@
 # 서버는 읽기 전용으로 등록된다 (-AllowWrite 를 주면 쓰기 툴까지). 다시 실행해도 된다 (업데이트용).
 #
 # 옵션:
-#   -TiaVersion 20|21     감지 대신 버전 지정 (둘 다 설치돼 있으면 높은 쪽을 고른다)
+#   -TiaVersion 20|21     감지 대신 이 버전만 빌드 (기본: 설치된 버전을 감지해서 빌드.
+#                         둘 다 있으면 둘 다 빌드하고 tiaportal-mcp-v20 / -v21 두 서버로 등록)
 #   -InstallDir <폴더>     소스/빌드 위치 (기본 C:\Tools\tiaportal-mcp)
 #   -NoInstall            빌드 도구를 자동 설치하지 않고 안내만
 #   -AddToOpennessGroup   그룹에 없으면 관리자 권한으로 현재 사용자를 추가 (UAC 창이 뜬다)
@@ -108,14 +109,18 @@ if ($TiaVersion -eq 0) {
     if ($found.Count -eq 0) {
         Fail "TIA Portal V20/V21 설치를 찾지 못했습니다. 다른 위치에 설치했다면 -TiaVersion 20 또는 21 을 지정하세요."
     }
+    # 둘 다 있으면 둘 다 빌드해서 두 서버로 등록한다.
     $TiaVersion = $found[0]
-    if ($found.Count -gt 1) { Warn "V20과 V21이 둘 다 있어 V$TiaVersion 용으로 빌드합니다. V20용은 -TiaVersion 20 으로 다시 실행하세요." }
-    Ok "TIA Portal V$TiaVersion 감지"
+    $buildVersions = $found
+    Ok ("TIA Portal 감지: " + (($found | ForEach-Object { "V$_" }) -join ", "))
+    if ($found.Count -gt 1) { Warn "V20과 V21이 둘 다 있어 둘 다 빌드하고 $ServerName-v20, $ServerName-v21 두 서버로 등록합니다. 하나만 원하면 -TiaVersion 20 또는 21 로 다시 실행하세요." }
 } elseif ($TiaVersion -ne 20 -and $TiaVersion -ne 21) {
     Fail "TiaVersion $TiaVersion 은 지원하지 않습니다. 20 또는 21을 쓰세요."
 } elseif (Test-Tia $TiaVersion) {
+    $buildVersions = @($TiaVersion)
     Ok "TIA Portal V$TiaVersion"
 } else {
+    $buildVersions = @($TiaVersion)
     Warn "TIA Portal V$TiaVersion 설치를 찾지 못했습니다. 빌드는 계속하지만 Openness DLL이 없으면 빌드가 실패합니다."
     $problems += "TIA Portal V$TiaVersion 없음"
 }
@@ -153,30 +158,41 @@ if (Test-Path (Join-Path $InstallDir ".git")) {
 }
 Ok $InstallDir
 
-Step "빌드 (TIA V$TiaVersion 용, 처음에는 패키지 다운로드로 몇 분 걸릴 수 있음)"
 $driver = Join-Path $InstallDir "third_party\S7CommPlusDriver\src\S7CommPlusDriver\S7CommPlusDriver.csproj"
-Run dotnet @("build", $driver, "-c", "Debug", "-p:Platform=x64", "-p:TargetFrameworkVersion=v4.8", "-nologo", "-v", "q")
 $server = Join-Path $InstallDir "src\TiaMcpServer\TiaMcpServer.csproj"
-Run dotnet @("build", $server, "-c", "Release", "-p:TiaVersion=$TiaVersion", "-nologo", "-v", "q")
+Step "빌드 (처음에는 패키지 다운로드로 몇 분 걸릴 수 있음)"
+Run dotnet @("build", $driver, "-c", "Debug", "-p:Platform=x64", "-p:TargetFrameworkVersion=v4.8", "-nologo", "-v", "q")
 
-# V20 빌드는 bin\Release, V21 빌드는 bin\V21\Release 에 생긴다.
-$binDir = if ($TiaVersion -eq 20) { "src\TiaMcpServer\bin\Release" } else { "src\TiaMcpServer\bin\V$TiaVersion\Release" }
-$exe = Get-ChildItem -Path (Join-Path $InstallDir $binDir) -Recurse -Filter "TiaMcpServer.exe" -ErrorAction SilentlyContinue |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $exe) { Fail "빌드는 끝났는데 $binDir 에서 TiaMcpServer.exe 를 찾지 못했습니다." }
-$exePath = $exe.FullName
-Ok $exePath
+# 버전마다 exe가 따로 생긴다: V20은 bin\Release, V21은 bin\V21\Release.
+$exes = @{}
+foreach ($v in $buildVersions) {
+    Step "빌드 (TIA V$v 용)"
+    Run dotnet @("build", $server, "-c", "Release", "-p:TiaVersion=$v", "-nologo", "-v", "q")
+    $binDir = if ($v -eq 20) { "src\TiaMcpServer\bin\Release" } else { "src\TiaMcpServer\bin\V$v\Release" }
+    $exe = Get-ChildItem -Path (Join-Path $InstallDir $binDir) -Recurse -Filter "TiaMcpServer.exe" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $exe) { Fail "빌드는 끝났는데 $binDir 에서 TiaMcpServer.exe 를 찾지 못했습니다." }
+    $exes[$v] = $exe.FullName
+    Ok $exes[$v]
 
-# 4. 환경 점검 (--doctor) -------------------------------------------------
-Step "환경 점검 (TiaMcpServer.exe --doctor)"
-& $exePath --tia-major-version $TiaVersion --doctor
-
+    Step "환경 점검 (V$v 용 TiaMcpServer.exe --doctor)"
+    & $exes[$v] --tia-major-version $v --doctor
+}
 # 5. MCP 클라이언트 등록 --------------------------------------------------
-$serverArgs = @("--tia-major-version", "$TiaVersion")
-if ($AllowWrite) { $serverArgs += "--allow-write" }
+# 한 버전만 빌드했으면 서버 이름은 그대로, 둘 다 빌드했으면 tiaportal-mcp-v20 / -v21 두 항목.
+# 각 서버는 자기 버전의 TIA Portal에만 붙으므로, 열어 둔 TIA 버전의 서버를 쓰면 된다.
+$servers = @()
+foreach ($v in $buildVersions) {
+    $vArgs = @("--tia-major-version", "$v")
+    if ($AllowWrite) { $vArgs += "--allow-write" }
+    $name = if ($buildVersions.Count -gt 1) { "$ServerName-v$v" } else { $ServerName }
+    $servers += [pscustomobject]@{ Name = $name; Command = $exes[$v]; Args = $vArgs }
+}
+# 이전 실행이 다른 구성으로 등록한 항목은 지운다.
+$oldNames = @($ServerName, "$ServerName-v20", "$ServerName-v21")
 $mode = if ($AllowWrite) { "쓰기 툴 포함" } else { "읽기 전용" }
 
-# mcpServers 형식 JSON 파일 하나에 이 서버 항목을 넣는다 (기존 파일은 .bak 으로 백업).
+# mcpServers 형식 JSON 파일 하나에 이 서버 항목들을 넣는다 (기존 파일은 .bak 으로 백업).
 function Register-JsonConfig([string]$cfg, [string]$label) {
     $json = $null
     if (Test-Path $cfg) {
@@ -191,8 +207,11 @@ function Register-JsonConfig([string]$cfg, [string]$label) {
     if (-not $json.PSObject.Properties["mcpServers"]) {
         $json | Add-Member -NotePropertyName mcpServers -NotePropertyValue ([pscustomobject]@{})
     }
-    $entry = [pscustomobject]@{ command = $exePath; args = $serverArgs }
-    $json.mcpServers | Add-Member -NotePropertyName $ServerName -NotePropertyValue $entry -Force
+    foreach ($old in $oldNames) { $json.mcpServers.PSObject.Properties.Remove($old) }
+    foreach ($s in $servers) {
+        $entry = [pscustomobject]@{ command = $s.Command; args = $s.Args }
+        $json.mcpServers | Add-Member -NotePropertyName $s.Name -NotePropertyValue $entry -Force
+    }
 
     # BOM 없는 UTF-8로 저장 (BOM이 있으면 못 읽는 클라이언트가 있다)
     [IO.File]::WriteAllText($cfg, ($json | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
@@ -202,7 +221,7 @@ function Register-JsonConfig([string]$cfg, [string]$label) {
 
 $registered = @()
 if (-not $NoRegister) {
-    Step "MCP 클라이언트 등록 ($mode)"
+    Step "MCP 클라이언트 등록 ($mode): $(($servers | ForEach-Object { $_.Name }) -join ', ')"
 
     # Claude Desktop: 일반 설치와 Microsoft Store(MSIX) 설치 경로 둘 다 확인
     $configs = @("$env:APPDATA\Claude\claude_desktop_config.json")
@@ -218,11 +237,13 @@ if (-not $NoRegister) {
 
     # Claude Code: CLI가 있으면 사용자 범위로 등록
     if (Get-Command claude -ErrorAction SilentlyContinue) {
-        & claude mcp remove $ServerName --scope user 2>$null | Out-Null
-        $claudeArgs = @("mcp", "add", $ServerName, "--scope", "user", "--", $exePath) + $serverArgs
-        & claude @claudeArgs
-        if ($LASTEXITCODE -eq 0) { Ok "Claude Code (user scope)"; $registered += "Claude Code" }
-        else { Warn "Claude Code 등록 실패. 직접 실행: claude mcp add $ServerName --scope user -- `"$exePath`" $($serverArgs -join ' ')" }
+        foreach ($old in $oldNames) { & claude mcp remove $old --scope user 2>$null | Out-Null }
+        foreach ($s in $servers) {
+            $claudeArgs = @("mcp", "add", $s.Name, "--scope", "user", "--", $s.Command) + $s.Args
+            & claude @claudeArgs
+            if ($LASTEXITCODE -eq 0) { Ok "Claude Code (user scope): $($s.Name)"; $registered += "Claude Code" }
+            else { Warn "Claude Code 등록 실패. 직접 실행: claude mcp add $($s.Name) --scope user -- `"$($s.Command)`" $($s.Args -join ' ')" }
+        }
     }
 
     if ($registered.Count -eq 0) {
@@ -232,13 +253,17 @@ if (-not $NoRegister) {
 
 # 다른 클라이언트용 설정 예시 (mcpServers 형식은 Claude Desktop, Antigravity, Cursor 등이 같다)
 Step "MCP 설정 예시"
-$example = [pscustomobject]@{ mcpServers = [pscustomobject]@{ $ServerName = [pscustomobject]@{ command = $exePath; args = $serverArgs } } }
+$example = [pscustomobject]@{ mcpServers = [pscustomobject]@{} }
+foreach ($s in $servers) {
+    $example.mcpServers | Add-Member -NotePropertyName $s.Name -NotePropertyValue ([pscustomobject]@{ command = $s.Command; args = $s.Args })
+}
 Write-Host ($example | ConvertTo-Json -Depth 5)
 
 # 6. 마무리 안내 ----------------------------------------------------------
 Step "다음 할 일"
 Write-Host "  1. MCP 클라이언트를 완전히 종료했다가 다시 켜세요 (Claude Desktop은 트레이 아이콘까지)."
-Write-Host "  2. TIA Portal V$TiaVersion 을 켜고 프로젝트를 연 다음 AI에게 'TIA Portal에 Connect 하고 GetProjectTree 해줘'라고 하세요."
+Write-Host "  2. TIA Portal 을 켜고 프로젝트를 연 다음 AI에게 'TIA Portal에 Connect 하고 GetProjectTree 해줘'라고 하세요."
+if ($servers.Count -gt 1) { Write-Host "     V20 프로젝트는 $ServerName-v20, V21 프로젝트는 $ServerName-v21 서버의 툴을 쓰세요 (다른 버전 서버는 TIA를 찾지 못합니다)." }
 Write-Host "  3. 처음 연결할 때 TIA Portal에 'Openness access' 창이 뜹니다. 'Yes to all'을 누르세요."
 Write-Host "     (창이 안 보이면 작업 표시줄의 TIA Portal을 눌러 보세요.)"
 if (-not $AllowWrite) {
