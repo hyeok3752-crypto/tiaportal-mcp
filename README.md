@@ -200,10 +200,26 @@ command.
 
 ## Requirements
 
-- __.net Framework 4.8__ installed
-- __Siemens TIA Portal V21__ installed and running on your machine
-- Check if under `Environment Variables/User variable for user <name>` the variable `TiaPortalLocation` is set to `C:\Program Files\Siemens\Automation\Portal V21`
-- User must be in Windows User Group `Siemens TIA Openness`
+- __Siemens TIA Portal V20 or V21__ installed and running on your machine (one build per version, see [TIA-Portal Versions](#tia-portal-versions))
+- User must be in Windows User Group `Siemens TIA Openness` (log off and on again after adding)
+- To build: git, .NET SDK 8 or newer, .NET Framework 4.8 Developer Pack
+- If TIA Portal is not installed in the default folder, set the user environment variable `TiaPortalLocation`, e.g. `C:\Program Files\Siemens\Automation\Portal V21`
+
+### Install with the script
+
+`install/install-tiaportal-mcp.ps1` does all of the above on a fresh PC. Download and run it in a normal
+PowerShell (no admin needed; Windows asks for confirmation when a tool or the group change needs it):
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/p-7347/tiaportal-mcp/rebase/upstream-base/install/install-tiaportal-mcp.ps1 -OutFile $env:TEMP\install-tiaportal-mcp.ps1; & $env:TEMP\install-tiaportal-mcp.ps1"
+```
+
+It installs missing build tools with winget, detects TIA Portal V20/V21 and builds for it, checks the
+`Siemens TIA Openness` group (`-AddToOpennessGroup` adds you), clones or updates the source in
+`C:\Tools\tiaportal-mcp`, runs `--doctor`, registers the server read-only with Claude Desktop,
+Claude Code and Antigravity when they are installed, and prints an `mcpServers` example for other
+clients. Options: `-TiaVersion 20|21`, `-InstallDir`, `-AllowWrite`, `-NoInstall`, `-NoRegister`.
+Run it again to update.
 
 ### Diagnose the environment
 
