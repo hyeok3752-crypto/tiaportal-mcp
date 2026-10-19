@@ -289,28 +289,35 @@ group the type already lives in to replace it.
 
 These are not gaps in this server - the underlying API offers no operation for them.
 
-- __No move or copy for blocks and types.__ `CopyBlock`, `MoveBlock`, `CopyType` and `MoveType`
-  are composed from export, import and (for a move) deleting the source once the import
+- __No move or copy for blocks and types.__ Openness only creates a block or type from a library
+  master copy or type version (`CreateFrom`), not from another block. `CopyBlock`, `MoveBlock`,
+  `CopyType` and `MoveType` are therefore composed from export, import and (for a move) deleting the source once the import
   succeeds. Two consequences are visible: the object must be consistent, because TIA Portal
   refuses to export an inconsistent one, and its block number travels with it, so importing
   into the same PLC can hit a number collision. Renaming during a copy is not offered - it
   would mean rewriting the exported XML.
-- __No generic "create block".__ Only `CreateFB` and `CreateInstanceDB` exist; every other kind
-  of block has to arrive through `ImportXmlBlock`.
+- __No generic "create block".__ Openness creates only FBs and instance DBs directly (`CreateFB`,
+  `CreateInstanceDB`). Every other block arrives through an import: XML (`ImportXmlBlock`), an
+  SCL/DB/STL source that TIA Portal compiles into blocks (`ImportSourceBlock`), or documents
+  (`ImportFromDocuments`, V20+). To change an existing block there is no need to rebuild its
+  XML by hand: `EditBlockNetwork` replaces, inserts or deletes one network (from XML or SCL
+  text) and `SetDbStartValue` changes one DB start value.
 - __Read-only objects.__ System constants cannot be created or changed, the force table cannot
   be created or deleted (the system owns one per PLC), the default tag table cannot be deleted,
   and the system groups (`Program blocks`, `PLC data types`, `PLC tags`, ...) cannot be renamed
   or deleted. These all fail with a `NotSupported` message rather than an opaque Openness error.
 - __No cross references__ for watch tables, force tables or external sources; `GetCrossReferences`
   reports `NotSupported` for them.
-- __Watch table entries__ cannot be created or deleted through this server yet. The Openness
-  composition holding them exposes only a comment-row creator, so adding a real entry needs an
-  untyped creation call whose required attribute names must first be read from the live API.
+- __Watch table entries__ cannot be created or deleted one at a time. The Openness composition
+  holding them exposes only a comment-row creator and entries have no delete. To change entries,
+  export the table (`ExportXmlWatchTable`), edit the XML and import it back (`ImportWatchTable`
+  replaces the table of the same name).
 - __Safety programs.__ F-blocks and safety tags reject most edits, sometimes requiring the safety
   password. The server does not pre-guess Siemens' rules: the underlying error is passed through
   with its original message.
-- __Know-how protected__ blocks and types are rejected before any edit, with a message asking you
-  to remove the protection in TIA Portal first.
+- __Know-how protected__ blocks and types are rejected before any edit (including
+  `EditBlockNetwork` and `SetDbStartValue`), with a message asking you to remove the protection
+  in TIA Portal first.
 
 ## Testing
 

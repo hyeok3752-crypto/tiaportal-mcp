@@ -91,6 +91,8 @@ namespace TiaMcpServer.Siemens
                         throw new PortalException(PortalErrorCode.NotFound, $"sclFile '{sclFile}' does not exist.");
                     }
 
+                    EnsureNotKnowHowProtected(block);
+
                     XElement? incoming = null;
                     if (mode != "delete" && !useScl)
                     {
